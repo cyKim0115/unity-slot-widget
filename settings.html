@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Unity Slot Widget</title>
+    <link rel="stylesheet" href="/src/styles.css" />
+    <script type="module" src="/src/settings.ts" defer></script>
+  </head>
+  <body class="settings-body">
+    <main class="settings">
+      <h1 data-t="settings.title"></h1>
+
+      <section>
+        <h2 data-t="settings.general"></h2>
+        <label class="field"
+          ><span data-t="settings.language"></span>
+          <select id="language">
+            <option value="auto" data-t="settings.languageAuto"></option>
+            <option value="ko">한국어</option>
+            <option value="en">English</option>
+          </select></label
+        >
+        <label class="field"><span data-t="settings.alwaysOnTop"></span><input id="alwaysOnTop" type="checkbox" /></label>
+        <label class="field"><span data-t="settings.autostart"></span><input id="autostart" type="checkbox" /></label>
+        <p id="autostart-hint" class="hint hidden" data-t="settings.autostartDev"></p>
+      </section>
+
+      <section>
+        <h2 data-t="settings.look"></h2>
+        <label class="field"><span data-t="settings.glass"></span><input id="glass" type="checkbox" /></label>
+        <label class="field"><span id="glassBlurLabel"></span><input id="glassBlur" type="range" min="0" max="32" step="1" /></label>
+        <p id="glass-hint" class="hint hidden" data-t="settings.glassUnsupported"></p>
+      </section>
+
+      <section>
+        <h2 data-t="settings.refresh"></h2>
+        <label class="field"><span data-t="settings.idleSecs"></span><input id="idleSecs" type="number" min="10" max="600" /></label>
+        <label class="field"><span data-t="settings.startingSecs"></span><input id="startingSecs" type="number" min="2" max="60" /></label>
+        <label class="field"><span data-t="settings.gitFullMins"></span><input id="gitFullMins" type="number" min="1" max="120" /></label>
+        <label class="field"><span data-t="settings.signalSecs"></span><input id="signalSecs" type="number" min="1" max="60" /></label>
+        <p class="hint" data-t="settings.refreshHint"></p>
+      </section>
+
+      <section>
+        <h2 data-t="settings.alerts"></h2>
+        <label class="field"><span data-t="settings.commitWarn"></span><input id="commitWarnPercent" type="number" min="50" max="99" /></label>
+        <label class="field"><span data-t="settings.commitCritical"></span><input id="commitCriticalPercent" type="number" min="50" max="100" /></label>
+        <label class="field"><span data-t="settings.slotMemory"></span><input id="slotMemoryWarnGb" type="number" min="1" max="128" step="0.5" /></label>
+        <label class="field"><span data-t="settings.localOnlyWarn"></span><input id="localOnlyWarnDays" type="number" min="0" max="365" /></label>
+        <label class="field"><span data-t="settings.localOnlyCritical"></span><input id="localOnlyCriticalDays" type="number" min="0" max="365" /></label>
+      </section>
+
+      <section>
+        <h2 data-t="settings.core"></h2>
+        <label class="field column"><span data-t="settings.script"></span><input id="unitySlotScript" type="text" spellcheck="false" /></label>
+        <p id="detected" class="hint"></p>
+        <p id="slotHome" class="hint"></p>
+        <label class="field column"><span data-t="settings.sample"></span><input id="sampleFile" type="text" spellcheck="false" /></label>
+      </section>
+    </main>
+    <div class="settings-actions">
+      <button id="cancel" class="btn" type="button" data-t="settings.cancel"></button>
+      <button id="save" class="btn primary" type="button" data-t="settings.save"></button>
+    </div>
+  </body>
+</html>

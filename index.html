@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Unity Slot Widget</title>
+    <link rel="stylesheet" href="/src/styles.css" />
+    <script type="module" src="/src/main.ts" defer></script>
+  </head>
+  <body>
+    <div class="widget" data-tauri-drag-region>
+      <canvas id="glass-backdrop" class="glass-backdrop" aria-hidden="true"></canvas>
+      <header class="header" data-tauri-drag-region>
+        <span id="title" class="title" data-tauri-drag-region>Unity slots</span>
+        <span id="busy" class="busy hidden" aria-hidden="true"></span>
+        <span id="summary" class="summary" data-tauri-drag-region></span>
+      </header>
+      <div id="bands" class="bands"></div>
+      <div id="list-wrap" class="list-wrap">
+        <div id="list" class="list"><div id="list-inner" class="list-inner"></div></div>
+      </div>
+      <footer class="footer" data-tauri-drag-region>
+        <span id="footer-left" class="footer-left" data-tauri-drag-region></span>
+        <span id="footer-right" class="footer-right" data-tauri-drag-region></span>
+      </footer>
+      <div id="toast" class="toast" role="status"></div>
+    </div>
+
+    <div id="menu-backdrop" class="menu-backdrop hidden"></div>
+    <div id="menu" class="menu hidden" role="menu">
+      <button id="menu-settings" class="menu-item" type="button" role="menuitem"></button>
+      <button id="menu-refresh" class="menu-item" type="button" role="menuitem"></button>
+      <button id="menu-cleanup" class="menu-item" type="button" role="menuitem"></button>
+      <button id="menu-events" class="menu-item" type="button" role="menuitem"></button>
+      <button id="menu-quit" class="menu-item danger" type="button" role="menuitem"></button>
+    </div>
+  </body>
+</html>
