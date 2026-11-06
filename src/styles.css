@@ -779,12 +779,73 @@ body.settings-body {
 .settings {
   max-width: 560px;
   margin: 0 auto;
-  padding: 18px 20px 72px;
+  padding: 0 20px 72px;
+}
+
+/* Title bar instead of the OS one (decorations: false), like Frond's settings dialog: a small
+   title and a close X on the window background. Its empty space drags the window (settings.ts).
+   Sticky so it stays reachable while the body scrolls; the side margins reach the window edges
+   (tauri.conf.json caps the window at the column width). */
+.settings-titlebar {
+  position: sticky;
+  top: 0;
+  z-index: 3;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 44px;
+  margin: 0 -20px 6px;
+  padding: 0 10px 0 20px;
+  background: var(--card-solid);
+  cursor: default;
+}
+
+.settings-titlebar,
+.settings-titlebar * {
+  user-select: none;
 }
 
 .settings h1 {
+  flex: 1 1 auto;
+  min-width: 0;
   font-size: 15px;
-  margin: 0 0 14px;
+  margin: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.titlebar-close {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.titlebar-close svg {
+  width: 16px;
+  height: 16px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.4;
+  stroke-linecap: round;
+}
+
+.titlebar-close:hover {
+  background: var(--pill);
+  color: var(--text);
+}
+
+.titlebar-close:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
 }
 
 .settings section {

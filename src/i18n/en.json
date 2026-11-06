@@ -165,6 +165,7 @@
   "settings.sample": "Sample data file (development and screenshots; usually empty)",
   "settings.save": "Save",
   "settings.cancel": "Cancel",
+  "settings.close": "Close (Esc, does not save)",
   "settings.saved": "Saved",
   "settings.source.setting": "setting",
   "settings.source.env": "environment variable",

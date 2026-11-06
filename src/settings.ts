@@ -1,4 +1,5 @@
-import { call, on } from "./backend";
+import { getCurrentWindow } from "@tauri-apps/api/window";
+import { call, inTauri, on } from "./backend";
 import { resolveLang, setLang, t } from "./i18n";
 import type { CoreLocation, WidgetSettings } from "./types";
 
@@ -27,6 +28,9 @@ function applyTexts() {
     el.textContent = t(el.dataset.t ?? "");
   });
   document.title = t("settings.title");
+  const close = document.getElementById("titlebar-close")!;
+  close.title = t("settings.close");
+  close.setAttribute("aria-label", t("settings.close"));
   updateBlurLabel();
 }
 
@@ -93,7 +97,35 @@ async function save() {
   await call("close_settings_window");
 }
 
+/** Cancel: put the last saved values back and hide the window. */
+function cancel() {
+  if (loaded) fill(loaded);
+  void call("close_settings_window");
+}
+
+/**
+ * Title bar. The settings window has no OS title bar (tauri.conf.json decorations: false), like
+ * Frond's settings dialog: a small title and a close X on the same background. X and Esc cancel.
+ * Dragging is handled here instead of data-tauri-drag-region, which maximizes on a double click
+ * and only drags from the exact element that carries it. Wired before any await so a failed load
+ * can still be closed.
+ */
+function initTitlebar() {
+  document.getElementById("titlebar-close")!.addEventListener("click", cancel);
+  window.addEventListener("keydown", (e) => {
+    if (e.key === "Escape") cancel();
+  });
+  document.querySelector(".settings-titlebar")!.addEventListener("mousedown", (event) => {
+    const e = event as MouseEvent;
+    if (e.button !== 0 || e.detail > 1 || !inTauri) return;
+    if ((e.target as Element).closest("button, a, input, select")) return;
+    e.preventDefault();
+    void getCurrentWindow().startDragging().catch(() => {});
+  });
+}
+
 async function boot() {
+  initTitlebar();
   input("glassBlur").addEventListener("input", updateBlurLabel);
   input("autostart").addEventListener("change", async () => {
     const box = input("autostart");
@@ -107,10 +139,7 @@ async function boot() {
     }
   });
   document.getElementById("save")!.addEventListener("click", () => void save());
-  document.getElementById("cancel")!.addEventListener("click", () => {
-    fill(loaded);
-    void call("close_settings_window");
-  });
+  document.getElementById("cancel")!.addEventListener("click", cancel);
   await on("settings-open", () => void load());
   await on("settings-cancelled", () => fill(loaded));
   await load();
