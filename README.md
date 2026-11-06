@@ -55,7 +55,7 @@
 시스템이 라이트 테마면 위젯도 라이트로 바뀝니다. 화면 글자는 한국어·영어 두 벌이고, 기본은 시스템 언어를 따릅니다.
 
 <p align="center">
-  <img src="docs/assets/widget-light.png" width="400" alt="라이트 테마의 위젯: 같은 슬롯 목록이 밝은 배경과 세이지 색 강조로 보인다">
+  <img src="docs/assets/widget-light.png" width="400" alt="라이트 테마의 위젯: 같은 슬롯 목록이 밝은 배경과 파란색 강조로 보인다">
 </p>
 
 ## 어떻게 동작하나

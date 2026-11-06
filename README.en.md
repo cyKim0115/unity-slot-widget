@@ -55,7 +55,7 @@ The right-click menu has Settings, Refresh, **Copy cleanup request**, Recent eve
 With a light system theme the widget turns light too. The text comes in Korean and English and follows the system language by default.
 
 <p align="center">
-  <img src="docs/assets/widget-light.png" width="400" alt="The widget in the light theme: the same slot list on a light background with sage accents">
+  <img src="docs/assets/widget-light.png" width="400" alt="The widget in the light theme: the same slot list on a light background with blue accents">
 </p>
 
 ## How it works
