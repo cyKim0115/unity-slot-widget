@@ -102,6 +102,10 @@ button {
   color: var(--hot);
 }
 
+.warn-text {
+  color: var(--warn);
+}
+
 .sep {
   margin: 0 4px;
   color: var(--muted);

@@ -22,6 +22,7 @@ const WIDGET_OWNED_FLAGS = new Set(["local-only-old", "commit-high", "commit-cri
 const FLAG_SEVERITY: Record<string, Severity> = {
   stalled: "critical",
   "lease-expired-open": "critical",
+  "lease-client-gone": "warn",
   "missing-path": "critical",
   "open-without-lease": "warn",
   "unsaved-scene": "warn",

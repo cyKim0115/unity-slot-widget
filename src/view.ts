@@ -123,6 +123,7 @@ function subLine(slot: Slot, git: GitState | null, ctx: RowContext): string {
   if (lease?.owner) {
     let text = esc(t("row.lease", { owner: shortOwner(lease.owner) }));
     if (lease.expired) text += ` <span class="hot-text">${esc(t("row.leaseExpired"))}</span>`;
+    else if (lease.client?.alive === false) text += ` <span class="warn-text">${esc(t("row.leaseClientGone"))}</span>`;
     else if (lease.acquiredAt) text += ` ${since(lease.acquiredAt, ctx.now)}`;
     parts.push(`<span class="lease" title="${esc(lease.owner)}${lease.need ? ` · ${esc(lease.need)}` : ""}">${text}</span>`);
   }
@@ -135,7 +136,13 @@ function tint(slot: Slot): string {
   const state = slot.editor?.state ?? "closed";
   const flags = slot.flags ?? [];
   if (state === "stalled" || state === "missing" || flags.includes("lease-expired-open")) return "tint-hot";
-  if (state === "starting" || flags.includes("open-without-lease") || flags.includes("unsaved-scene")) return "tint-warn";
+  if (
+    state === "starting" ||
+    flags.includes("open-without-lease") ||
+    flags.includes("unsaved-scene") ||
+    flags.includes("lease-client-gone")
+  )
+    return "tint-warn";
   if (state === "closed") return "is-closed";
   return "";
 }
@@ -195,19 +202,27 @@ function details(slot: Slot, ctx: RowContext): string {
   }
   const l = slot.lease;
   if (l?.owner) {
-    rows.push(
-      detailRow(
-        t("detail.lease"),
-        esc(
-          t("detail.leaseLine", {
-            owner: l.owner,
-            need: l.need || none,
-            from: formatWhen(l.acquiredAt, ctx.now),
-            until: formatWhen(l.expiresAt, ctx.now),
-          }),
-        ),
-      ),
+    let value = esc(
+      t("detail.leaseLine", {
+        owner: l.owner,
+        need: l.need || none,
+        from: formatWhen(l.acquiredAt, ctx.now),
+        until: formatWhen(l.expiresAt, ctx.now),
+      }),
     );
+    // The agent client that took the lease (MCP leases only, core 0.5.5+).
+    if (l.client) {
+      const gone = l.client.alive === false;
+      const line = esc(
+        t("detail.leaseClient", {
+          name: l.client.name ?? none,
+          pid: l.client.pid ?? none,
+          state: t(gone ? "detail.clientGone" : "detail.clientAlive"),
+        }),
+      );
+      value += `<br>${gone ? `<span class="warn-text">${line}</span>` : line}`;
+    }
+    rows.push(detailRow(t("detail.lease"), value));
   }
   const g = ctx.gitOf(slot);
   if (g) {

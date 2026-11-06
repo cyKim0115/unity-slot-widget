@@ -37,6 +37,8 @@ export interface Lease {
   expired?: boolean;
   openedByAcquire?: boolean;
   host?: string | null;
+  /** The MCP client process that took the lease (core 0.5.5+); null for CLI and older leases. */
+  client?: { name?: string | null; pid?: number | null; startedAt?: string | null; alive?: boolean | null } | null;
 }
 
 export interface GitState {
@@ -67,6 +69,7 @@ export type SlotFlag =
   | "batch-running"
   | "missing-path"
   | "local-only-old"
+  | "lease-client-gone"
   | string;
 
 export interface Slot {
