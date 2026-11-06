@@ -10,7 +10,7 @@
  * - nothing while the widget is hidden.
  */
 
-import { call, isWindowVisible, on } from "./backend";
+import { call, inTauri, isWindowVisible, on } from "./backend";
 import { setGlassBlur, setGlassClass, onGlassFrame, type GlassFrame } from "./glass";
 import { currentLang, formatClock, formatDuration, formatWhen, resolveLang, setLang, t } from "./i18n";
 import { icon } from "./icons";
@@ -200,7 +200,8 @@ function updateFade() {
 
 function renderFooter() {
   const left: string[] = [];
-  if (receivedAt) left.push(t("footer.updated", { time: formatClock(new Date(receivedAt)) }));
+  // The time the core produced the document (for a sample, its own time).
+  if (receivedAt) left.push(t("footer.updated", { time: formatClock(doc?.time ? new Date(doc.time) : new Date(receivedAt)) }));
   if (paused) left.push(t("footer.paused"));
   else if (nextAt) left.push(t("footer.next", { secs: Math.max(0, Math.round((nextAt - Date.now()) / 1000)) }));
   const fetches = (doc?.slots ?? []).map((s) => s.git?.lastFetchAt).filter((x): x is string => !!x).sort();
@@ -353,6 +354,18 @@ async function applySettings(next: WidgetSettings, first: boolean) {
 
 async function boot() {
   await applySettings(await call<WidgetSettings>("get_settings"), true);
+  if (!inTauri) {
+    // Browser preview only (README screenshots): ?expand=<slot>[,<slot>]&events=1
+    const query = new URLSearchParams(location.search);
+    for (const name of (query.get("expand") ?? "").split(",").filter(Boolean)) expanded.add(name);
+    showEvents = query.get("events") === "1";
+    // ?frame=400x575 draws the widget at that size whatever the browser window is.
+    const frame = /^(\d+)x(\d+)$/.exec(query.get("frame") ?? "");
+    if (frame) {
+      document.body.style.width = `${frame[1]}px`;
+      document.body.style.height = `${frame[2]}px`;
+    }
+  }
   render();
 
   $("list").addEventListener("click", (e) => void onListClick(e));
