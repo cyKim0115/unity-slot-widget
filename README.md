@@ -115,7 +115,7 @@ flowchart LR
 
 ### 릴리스
 
-[Releases](https://github.com/cyKim0115/unity-slot-widget/releases)에서 `Unity Slot Widget_<버전>_x64-setup.exe`를 받아 실행합니다. 현재 사용자에게만 설치되고 관리자 권한이 필요 없습니다. 함께 올린 SHA-256으로 파일을 확인할 수 있습니다.
+[Releases](https://github.com/cyKim0115/unity-slot-widget/releases)에서 `Unity-Slot-Widget_<버전>_x64-setup.exe`를 받아 실행합니다. 현재 사용자에게만 설치되고 관리자 권한이 필요 없습니다. 함께 올린 SHA-256으로 파일을 확인할 수 있습니다.
 
 > 설치 파일에 코드 서명이 없어서, 처음 실행할 때 Windows SmartScreen이 「Windows의 PC 보호」를 띄울 수 있습니다. **추가 정보 → 실행**을 누르면 됩니다. 꺼림칙하면 아래처럼 소스에서 빌드하세요.
 
@@ -131,6 +131,8 @@ npm run tauri dev          # 개발 실행
 ```
 
 `start.bat`(또는 `시작.bat`)은 릴리스 exe를 빌드하고 `%LOCALAPPDATA%\UnitySlotWidget`에 설치한 뒤 실행합니다. 다시 실행하면 소스가 바뀌었을 때만 다시 빌드합니다. 탐색기나 직접 연 터미널에서 실행하세요. 앱 컨테이너 안에서 도는 에이전트 셸에서 실행하면 AppData 쓰기가 가상화돼 다른 곳에 설치될 수 있습니다.
+
+설치 파일은 `scripts\build-release.ps1`로 만듭니다. Rust가 실행 파일에 넣는 소스 경로에서 사용자 폴더를 지우고, 그래도 남아 있으면 멈춥니다. 끝나면 `SHA256SUMS.txt`를 남깁니다.
 
 Tauri 없이 화면만 보려면 `npm run dev`를 실행한 뒤 브라우저에서 `http://localhost:1431/?sample=dashboard&lang=ko`를 엽니다. 예시는 `samples/`에 있고 `sample=states`도 있습니다.
 

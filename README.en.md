@@ -115,7 +115,7 @@ The state folder is `UNITY_SLOT_HOME`, or `%USERPROFILE%\.unity-slot`, the same 
 
 ### Release
 
-Download `Unity Slot Widget_<version>_x64-setup.exe` from [Releases](https://github.com/cyKim0115/unity-slot-widget/releases) and run it. It installs for the current user only, without admin rights. Check the file against the SHA-256 published with it.
+Download `Unity-Slot-Widget_<version>_x64-setup.exe` from [Releases](https://github.com/cyKim0115/unity-slot-widget/releases) and run it. It installs for the current user only, without admin rights. Check the file against the SHA-256 published with it.
 
 > The installer is not code-signed, so on first run Windows SmartScreen may show "Windows protected your PC". Choose **More info → Run anyway**. If you would rather not, build from source.
 
@@ -131,6 +131,8 @@ npm run tauri dev          # development run
 ```
 
 `start.bat` builds a release exe, installs it to `%LOCALAPPDATA%\UnitySlotWidget` and starts it. Later runs rebuild only when the source changed. Run it from Explorer or your own terminal. An agent shell that runs inside an app container may virtualize AppData writes and install it somewhere else.
+
+The installer comes from `scripts\build-release.ps1`. It strips the user folder from the source paths Rust puts into the binary, stops if any is left, and writes `SHA256SUMS.txt`.
 
 To see the screens without Tauri, run `npm run dev` and open `http://localhost:1431/?sample=dashboard&lang=en` in a browser. The samples are in `samples/`; there is also `sample=states`.
 
