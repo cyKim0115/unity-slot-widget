@@ -1,0 +1,70 @@
+{
+  "schema": "unity-slot.dashboard/1",
+  "version": "0.3.0",
+  "time": "2026-11-06T18:20:00+09:00",
+  "host": "DEV-PC",
+  "registry": { "path": "C:\\Projects\\.unity-slot\\slots.json", "updatedAt": "2026-11-06T16:55:55+09:00", "maxEditors": 4 },
+  "system": { "commit": { "usedGB": 121.9, "limitGB": 132.3, "percent": 92 }, "freePhysicalGB": 3.4, "editorsOpen": 4 },
+  "slots": [
+    {
+      "name": "Demo-Stalled", "path": "C:\\Projects\\Demo-Stalled", "project": "my-org/demo", "repo": "Demo", "kind": "clone",
+      "unity": "6000.6.0f1", "platform": "Android", "purposes": ["agent"], "mode": "ondemand", "agentUse": true, "exists": true,
+      "editor": { "state": "stalled", "pid": 6012, "startedAt": "2026-11-06T18:12:30+09:00", "launch": "direct", "standby": "1", "lock": "held",
+        "memory": { "editorPrivGB": 2.1, "workersPrivGB": 0.3, "childrenPrivGB": 0.2, "totalPrivGB": 2.6, "totalWsGB": 2.2, "workers": 1, "children": 4 } },
+      "lease": { "owner": "claude:5be0246a", "need": "agent", "acquiredAt": "2026-11-06T18:12:29+09:00", "expiresAt": "2026-11-07T02:12:29+09:00", "expired": false, "openedByAcquire": true },
+      "git": { "level": "basic", "branch": "master", "upstream": "origin/master", "changes": 0, "ahead": 0, "behind": 0 },
+      "flags": ["stalled"]
+    },
+    {
+      "name": "Demo-Expired", "path": "C:\\Projects\\Demo-Expired", "project": "my-org/demo", "repo": "Demo", "kind": "clone",
+      "unity": "6000.6.0f1", "platform": "WebGL", "purposes": ["webgl"], "mode": "ondemand", "agentUse": true, "exists": true,
+      "editor": { "state": "ready", "pid": 7120, "startedAt": "2026-11-06T08:02:00+09:00", "readyAt": "2026-11-06T08:02:14+09:00", "readySeconds": 14.2,
+        "launch": "direct", "standby": "1", "lock": "held", "unsavedScene": false,
+        "memory": { "editorPrivGB": 4.1, "workersPrivGB": 1.2, "childrenPrivGB": 1.1, "totalPrivGB": 6.4, "totalWsGB": 5.6, "workers": 1, "children": 18 } },
+      "lease": { "owner": "codex:night-run", "need": "webgl", "acquiredAt": "2026-11-06T08:00:00+09:00", "expiresAt": "2026-11-06T16:00:00+09:00", "expired": true, "openedByAcquire": true },
+      "git": { "level": "basic", "branch": "build/webgl", "upstream": "origin/build/webgl", "changes": 1, "ahead": 2, "behind": 0 },
+      "flags": ["lease-expired-open"]
+    },
+    {
+      "name": "Demo-Expiring", "path": "C:\\Projects\\Demo-Expiring", "project": "my-org/demo", "repo": "Demo", "kind": "clone",
+      "unity": "6000.6.0f1", "platform": "Android", "purposes": ["agent"], "mode": "hot", "agentUse": true, "exists": true,
+      "editor": { "state": "ready", "pid": 8240, "startedAt": "2026-11-06T10:30:00+09:00", "readyAt": "2026-11-06T10:30:12+09:00", "readySeconds": 12.3,
+        "launch": "direct", "standby": "1", "lock": "held", "unsavedScene": false,
+        "memory": { "editorPrivGB": 4.6, "workersPrivGB": 1.2, "childrenPrivGB": 1.6, "totalPrivGB": 7.4, "totalWsGB": 6.0, "workers": 1, "children": 20 } },
+      "lease": { "owner": "claude:a8f884d1", "need": "agent", "acquiredAt": "2026-11-06T10:35:00+09:00", "expiresAt": "2026-11-06T18:35:00+09:00", "expired": false, "openedByAcquire": false },
+      "git": { "level": "basic", "branch": "master", "upstream": "origin/master", "changes": 0, "ahead": 0, "behind": 0 },
+      "flags": ["lease-expiring"]
+    },
+    {
+      "name": "Demo-Batch", "path": "C:\\Projects\\Demo-Batch", "project": "my-org/demo", "repo": "Demo", "kind": "clone",
+      "unity": "6000.6.0f1", "platform": "Android", "purposes": ["build"], "mode": "ondemand", "agentUse": true, "exists": true,
+      "editor": { "state": "batch", "pid": 9300, "startedAt": "2026-11-06T18:05:00+09:00", "launch": "direct" },
+      "lease": null,
+      "git": { "level": "basic", "branch": "master", "upstream": "origin/master", "changes": 0, "ahead": 0, "behind": 0 },
+      "flags": ["batch-running"]
+    },
+    {
+      "name": "Demo-Lock", "path": "C:\\Projects\\Demo-Lock", "project": "my-org/demo", "repo": "Demo", "kind": "clone",
+      "unity": "6000.6.0f1", "platform": "Windows", "purposes": ["windows"], "mode": "ondemand", "agentUse": true, "exists": true,
+      "editor": { "state": "closed", "lock": "stale" },
+      "lease": null,
+      "git": { "level": "basic", "branch": "master", "upstream": "origin/master", "upstreamGone": true, "changes": 0, "ahead": 0, "behind": 0 },
+      "lastClosedAt": "2026-11-06T11:00:00+09:00",
+      "flags": ["stale-lock"]
+    },
+    {
+      "name": "Demo-Moved", "path": "C:\\Projects\\Demo-Moved", "project": "my-org/demo", "repo": "Demo", "kind": "clone",
+      "unity": "6000.6.0f1", "platform": "Android", "purposes": ["agent"], "mode": "ondemand", "agentUse": true, "exists": false,
+      "editor": { "state": "missing" }, "lease": null, "git": null,
+      "flags": ["missing-path"]
+    }
+  ],
+  "unregisteredEditors": [
+    { "pid": 11020, "project": "C:\\Projects\\Scratch", "startedAt": "2026-11-06T17:00:00+09:00", "launch": "hub",
+      "memory": { "totalPrivGB": 6.8, "totalWsGB": 5.1 } }
+  ],
+  "orphanWorkers": [ { "pid": 12044, "ownerPid": 5010, "project": "C:\\Projects\\Demo-Stalled", "privGB": 0.9 } ],
+  "recentEvents": [],
+  "systemFlags": ["commit-critical", "editors-at-max"],
+  "timing": { "totalMs": 1380, "processMs": 610, "gitMs": 310 }
+}
