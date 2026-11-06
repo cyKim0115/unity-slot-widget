@@ -2,29 +2,37 @@
  * Shape and type follow the author's other widgets (Repo Multi-Check, Claude Usage, Flex Work):
  * 12px squircle card, uppercase captions, card rows, hidden scrollbar with fades. Numbers are colored text
  * without backgrounds (like the Claude, GPT and Flex widgets); only warnings get a tinted box.
- * Colors are sage charcoal, dark and light, following the system theme.
+ * Colors match the other widgets too: graphite card (22, 24, 28), blue #5b9fd4 for fills (spinner,
+ * checkboxes, primary button), amber warnings, red errors and green "ok". Small colored text uses the
+ * other widgets' text shades rather than their fill shades: blue #9fd0ff (Repo Multi-Check's pull
+ * count), red #f87171 (their error text), menu danger #ffb4ab. The fill reds #e0524a/#d46b5b and the
+ * fill blue drop to 3.3-4.4:1 as text on the card when a white window shows through.
+ * The light set (system light theme) uses Flex Work's slate background with the same hues darkened
+ * to stay above 4.5:1 on the card, glass included.
  */
 :root {
   color-scheme: dark;
-  --card: rgba(27, 34, 33, 0.92);
-  --card-solid: rgb(27, 34, 33);
-  --card-glass: rgba(27, 34, 33, 0.88);
-  --surface: rgba(228, 234, 228, 0.04);
-  --surface-strong: rgba(228, 234, 228, 0.07);
-  --text: #e4eae4;
-  --muted: #949a96;
-  --border: rgba(228, 234, 228, 0.08);
-  --accent: #96bea1;
-  --ok: #96bea1;
-  --warn: #e6bf7f;
-  --hot: #f29a8c;
-  --info: #b9cbdb;
-  --pill: rgba(228, 234, 228, 0.08);
-  --tint-warn: rgba(212, 161, 91, 0.1);
-  --tint-warn-line: rgba(212, 161, 91, 0.2);
-  --tint-hot: rgba(224, 122, 107, 0.12);
-  --tint-hot-line: rgba(224, 122, 107, 0.25);
-  --menu: rgba(21, 27, 26, 0.98);
+  --card: rgba(22, 24, 28, 0.92);
+  --card-solid: rgb(22, 24, 28);
+  --card-glass: rgba(22, 24, 28, 0.88);
+  --surface: rgba(255, 255, 255, 0.04);
+  --surface-strong: rgba(255, 255, 255, 0.07);
+  --text: #e8eaed;
+  --muted: #9aa0a6;
+  --border: rgba(255, 255, 255, 0.08);
+  --accent: #5b9fd4;
+  --ok: #7dd3a0;
+  --warn: #e0a95b;
+  --hot: #f87171;
+  --info: #9fd0ff;
+  --danger-text: #ffb4ab;
+  --pill: rgba(255, 255, 255, 0.08);
+  --tint-warn: rgba(224, 169, 91, 0.1);
+  --tint-warn-line: rgba(224, 169, 91, 0.2);
+  --tint-hot: rgba(224, 82, 74, 0.12);
+  --tint-hot-line: rgba(224, 82, 74, 0.25);
+  --menu: rgba(18, 20, 24, 0.98);
+  --on-accent: #16181c;
   --shadow: 0 10px 24px rgba(0, 0, 0, 0.35);
   font-family: "Segoe UI", "Malgun Gothic", sans-serif;
 }
@@ -32,25 +40,27 @@
 @media (prefers-color-scheme: light) {
   :root {
     color-scheme: light;
-    --card: rgba(252, 253, 252, 0.95);
-    --card-solid: rgb(252, 253, 252);
-    --card-glass: rgba(252, 253, 252, 0.88);
-    --surface: rgba(44, 51, 51, 0.04);
-    --surface-strong: rgba(44, 51, 51, 0.07);
-    --text: #2c3333;
-    --muted: #515b56;
-    --border: #dae1da;
-    --accent: #567e65;
-    --ok: #567e65;
-    --warn: #8a5a12;
-    --hot: #b23a2a;
-    --info: #3f6380;
-    --pill: rgba(44, 51, 51, 0.07);
-    --tint-warn: rgba(154, 100, 22, 0.07);
-    --tint-warn-line: rgba(154, 100, 22, 0.2);
-    --tint-hot: rgba(182, 64, 47, 0.07);
-    --tint-hot-line: rgba(182, 64, 47, 0.22);
-    --menu: rgba(252, 253, 252, 0.99);
+    --card: rgba(248, 250, 252, 0.95);
+    --card-solid: rgb(248, 250, 252);
+    --card-glass: rgba(248, 250, 252, 0.88);
+    --surface: rgba(15, 23, 42, 0.04);
+    --surface-strong: rgba(15, 23, 42, 0.07);
+    --text: #0f172a;
+    --muted: #485262;
+    --border: rgba(15, 23, 42, 0.1);
+    --accent: #2b6496;
+    --ok: #1f7a4d;
+    --warn: #7a4f0f;
+    --hot: #b42318;
+    --info: #2b6496;
+    --danger-text: #b42318;
+    --pill: rgba(15, 23, 42, 0.07);
+    --tint-warn: rgba(122, 79, 15, 0.07);
+    --tint-warn-line: rgba(122, 79, 15, 0.2);
+    --tint-hot: rgba(180, 35, 24, 0.07);
+    --tint-hot-line: rgba(180, 35, 24, 0.22);
+    --menu: rgba(255, 255, 255, 0.98);
+    --on-accent: #ffffff;
     --shadow: 0 10px 24px rgba(0, 0, 0, 0.14);
   }
 }
@@ -525,8 +535,8 @@ html.glass .list-wrap.fade-top.fade-bottom .list {
 
 .state-batch .dot {
   border-radius: 2px;
-  background: var(--info);
-  border-color: var(--info);
+  background: var(--accent);
+  border-color: var(--accent);
 }
 
 .state-missing .dot {
@@ -543,13 +553,13 @@ html.glass .list-wrap.fade-top.fade-bottom .list {
   min-width: 0;
 }
 
-/* Platform and tags are plain text: small caps in the accent color, then muted words. */
+/* Platform and tags are plain text: small caps in the blue text color, then muted words. */
 .chip {
   flex: none;
   font-size: 9.5px;
   font-weight: 700;
   letter-spacing: 0.06em;
-  color: var(--accent);
+  color: var(--info);
 }
 
 .tags {
@@ -637,7 +647,7 @@ html.glass .list-wrap.fade-top.fade-bottom .list {
 
 .mini:hover {
   background: var(--pill);
-  color: var(--accent);
+  color: var(--info);
 }
 
 .empty {
@@ -732,7 +742,7 @@ html.glass .list-wrap.fade-top.fade-bottom .list {
 }
 
 .menu-item.danger {
-  color: var(--hot);
+  color: var(--danger-text);
 }
 
 .toast {
@@ -858,12 +868,6 @@ body.settings-body {
 .btn.primary {
   background: var(--accent);
   border-color: var(--accent);
-  color: #1b2221;
+  color: var(--on-accent);
   font-weight: 600;
-}
-
-@media (prefers-color-scheme: light) {
-  .btn.primary {
-    color: #ffffff;
-  }
 }

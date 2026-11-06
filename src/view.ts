@@ -1,7 +1,7 @@
 /**
  * HTML for the widget body. Every value from the dashboard goes through `esc`.
  * The look follows the author's other widgets (Repo Multi-Check, Claude Usage, ...):
- * uppercase captions, card rows, round pills; the colors are sage charcoal.
+ * uppercase captions, card rows, round pills, and the same graphite colors with a blue accent.
  */
 import type { Dashboard, GitState, Slot, SlotEvent, WidgetSettings } from "./types";
 import { formatDuration, formatGb, formatWhen, t } from "./i18n";
