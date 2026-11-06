@@ -1,0 +1,33 @@
+[package]
+name = "unity-slot-widget"
+version = "0.1.0"
+description = "Desktop widget that shows unity-slot slots, editors, leases and memory"
+authors = ["cyKim0115"]
+license = "MIT"
+edition = "2021"
+
+[lib]
+name = "unity_slot_widget_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = ["tray-icon"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+auto-launch = "0.5"
+tauri-plugin-window-state = "2"
+winreg = "0.55"
+windows-version = "0.1"
+# Same windows version as tauri (0.61).
+# glass.rs: capture behind the widget. signals.rs: ToolHelp process list. open.rs: ShellExecuteW.
+windows = { version = "0.61", features = [
+  "Win32_Foundation",
+  "Win32_Graphics_Gdi",
+  "Win32_UI_HiDpi",
+  "Win32_UI_Shell",
+  "Win32_UI_WindowsAndMessaging",
+  "Win32_System_Diagnostics_ToolHelp",
+] }
