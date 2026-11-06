@@ -1,6 +1,7 @@
 /*
  * Shape and type follow the author's other widgets (Repo Multi-Check, Claude Usage, Flex Work):
- * 12px squircle card, uppercase captions, card rows, round pills, hidden scrollbar with fades.
+ * 12px squircle card, uppercase captions, card rows, hidden scrollbar with fades. Numbers are colored text
+ * without backgrounds (like the Claude, GPT and Flex widgets); only warnings get a tinted box.
  * Colors are sage charcoal, dark and light, following the system theme.
  */
 :root {
@@ -19,10 +20,6 @@
   --hot: #f29a8c;
   --info: #b9cbdb;
   --pill: rgba(228, 234, 228, 0.08);
-  --pill-ok: rgba(150, 190, 161, 0.2);
-  --pill-warn: rgba(212, 161, 91, 0.25);
-  --pill-hot: rgba(224, 122, 107, 0.27);
-  --pill-info: rgba(159, 180, 199, 0.22);
   --tint-warn: rgba(212, 161, 91, 0.1);
   --tint-warn-line: rgba(212, 161, 91, 0.2);
   --tint-hot: rgba(224, 122, 107, 0.12);
@@ -49,10 +46,6 @@
     --hot: #b23a2a;
     --info: #3f6380;
     --pill: rgba(44, 51, 51, 0.07);
-    --pill-ok: rgba(86, 126, 101, 0.16);
-    --pill-warn: rgba(154, 100, 22, 0.16);
-    --pill-hot: rgba(182, 64, 47, 0.14);
-    --pill-info: rgba(63, 99, 128, 0.13);
     --tint-warn: rgba(154, 100, 22, 0.07);
     --tint-warn-line: rgba(154, 100, 22, 0.2);
     --tint-hot: rgba(182, 64, 47, 0.07);
@@ -203,62 +196,42 @@ html.glass .glass-backdrop {
   min-width: 0;
 }
 
-/* ---- pills (same shape as Repo Multi-Check status icons) ---- */
-.pill {
+/* ---- numbers: colored text, no background (like the Claude, GPT and Flex widgets) ---- */
+.stat {
   display: inline-flex;
   align-items: center;
   gap: 2px;
-  padding: 2px 5px;
-  border-radius: 999px;
   font-size: 11px;
-  font-weight: 700;
+  font-weight: 600;
   line-height: 1;
-  background: var(--pill);
   color: var(--muted);
   white-space: nowrap;
   cursor: default;
 }
 
-.pill-mark {
+.stat-mark {
   display: inline-flex;
-  font-size: 12px;
+  font-size: 11px;
   line-height: 1;
 }
 
-.pill-count {
-  font-size: 10px;
-  font-weight: 600;
-}
-
-.pill--ok,
-.pill--open {
-  background: var(--pill-ok);
+.stat--ok {
   color: var(--ok);
 }
 
-.pill--warn,
-.pill--push {
-  background: var(--pill-warn);
+.stat--warn,
+.stat--push {
   color: var(--warn);
 }
 
-.pill--hot,
-.pill--dirty {
-  background: var(--pill-hot);
+.stat--hot,
+.stat--dirty {
   color: var(--hot);
 }
 
-.pill--pull,
-.pill--local {
-  background: var(--pill-info);
+.stat--pull,
+.stat--local {
   color: var(--info);
-}
-
-.pill--idle,
-.pill--mem,
-.pill--branch {
-  background: var(--pill);
-  color: var(--muted);
 }
 
 /* ---- warning band ---- */
@@ -428,7 +401,7 @@ html.glass .list-wrap.fade-top.fade-bottom .list {
   margin-bottom: 4px;
 }
 
-.section-label .pill {
+.section-label .stat {
   letter-spacing: normal;
   text-transform: none;
 }
@@ -516,7 +489,7 @@ html.glass .list-wrap.fade-top.fade-bottom .list {
   flex-wrap: wrap;
   justify-content: flex-end;
   align-items: center;
-  gap: 4px;
+  gap: 8px;
 }
 
 .dot {
@@ -570,24 +543,20 @@ html.glass .list-wrap.fade-top.fade-bottom .list {
   min-width: 0;
 }
 
+/* Platform and tags are plain text: small caps in the accent color, then muted words. */
 .chip {
   flex: none;
-  font-size: 9px;
+  font-size: 9.5px;
   font-weight: 700;
-  letter-spacing: 0.04em;
-  padding: 1px 4px;
-  border-radius: 4px;
-  background: var(--pill-ok);
+  letter-spacing: 0.06em;
   color: var(--accent);
 }
 
-.tag {
+.tags {
   flex: none;
-  font-size: 9.5px;
-  padding: 0 4px;
-  border-radius: 4px;
-  border: 1px solid var(--border);
+  font-size: 10px;
   color: var(--muted);
+  white-space: nowrap;
 }
 
 /* When the row is narrow the branch gives way first, then the lease, then the state. */

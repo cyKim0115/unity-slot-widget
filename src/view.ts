@@ -45,9 +45,13 @@ function since(iso: string | null | undefined, now: Date): string {
   return `<span data-since="${esc(iso)}">${esc(formatDuration(ms))}</span>`;
 }
 
-/** Round status pill. `mark` is a glyph or an icon from icons.ts (trusted HTML). */
+/**
+ * A number with an optional glyph, colored by meaning and without a background, the way the
+ * Claude, GPT and Flex widgets show their values. `mark` is a glyph or an icon from icons.ts
+ * (trusted HTML).
+ */
 export function pill(kind: string, mark: string, text: string | number, title: string): string {
-  return `<span class="pill pill--${kind}" title="${esc(title)}">${mark ? `<span class="pill-mark">${mark}</span>` : ""}<span class="pill-count">${esc(text)}</span></span>`;
+  return `<span class="stat stat--${kind}" title="${esc(title)}">${mark ? `<span class="stat-mark">${mark}</span>` : ""}<span>${esc(text)}</span></span>`;
 }
 
 export interface RowContext {
@@ -60,7 +64,7 @@ export interface RowContext {
 function memoryPill(slot: Slot, ctx: RowContext): string {
   const gb = slot.editor?.memory?.totalPrivGB;
   if (typeof gb !== "number" || !isOpen(slot)) return "";
-  return pill(gb >= ctx.settings.slotMemoryWarnGb ? "warn" : "mem", "", `${formatGb(gb)}G`, t("detail.memory"));
+  return pill(gb >= ctx.settings.slotMemoryWarnGb ? "warn" : "plain", "", `${formatGb(gb)}G`, t("detail.memory"));
 }
 
 function gitPills(git: GitState | null, ctx: RowContext): string {
@@ -258,7 +262,7 @@ function row(slot: Slot, ctx: RowContext): string {
       <span class="dot" aria-hidden="true"></span>
       <span class="name" title="${esc(slot.name)}">${esc(slot.name)}</span>
       ${platformChip(slot.platform)}
-      ${tags.map((x) => `<span class="tag">${esc(x)}</span>`).join("")}
+      ${tags.length ? `<span class="tags">${tags.map(esc).join(" · ")}</span>` : ""}
       <span class="head-end">${memoryPill(slot, ctx)}</span>
     </div>
     <div class="slot-foot">
@@ -284,7 +288,7 @@ export function slotList(doc: Dashboard, ctx: RowContext): string {
     const sorted = [...members.filter(isOpen), ...members.filter((s) => !isOpen(s))];
     html.push(`<section class="group">
       <div class="section-label"><span>${esc(name)}</span>${pill(
-        openCount ? "open" : "idle",
+        "plain",
         "",
         `${openCount}/${members.length}`,
         t("row.openCount", { open: openCount, total: members.length }),
@@ -322,10 +326,11 @@ export function eventsPanel(events: SlotEvent[], now: Date): string {
 
 /** Header pills: open editors and system commit, colored by the alert settings. */
 export function headerPills(open: number, max: number, percent: number | undefined, settings: WidgetSettings): string {
-  const out = [pill(open >= max && max > 0 ? "warn" : "open", "", t("header.open", { open, max }), t("header.open", { open, max }))];
+  // Muted unless something needs attention, like the plan text in the Claude widget.
+  const out = [pill(open >= max && max > 0 ? "warn" : "plain", "", t("header.open", { open, max }), t("header.open", { open, max }))];
   if (typeof percent === "number") {
-    const kind = percent >= settings.commitCriticalPercent ? "hot" : percent >= settings.commitWarnPercent ? "warn" : "ok";
+    const kind = percent >= settings.commitCriticalPercent ? "hot" : percent >= settings.commitWarnPercent ? "warn" : "plain";
     out.push(pill(kind, "", t("header.commit", { percent }), t("header.commit", { percent })));
   }
-  return out.join("");
+  return out.join('<span class="sep">·</span>');
 }
