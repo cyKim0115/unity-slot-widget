@@ -1,0 +1,20 @@
+# Build output (must stay out of commits and the public check)
+node_modules/
+dist/
+src-tauri/target/
+src-tauri/gen/
+*.msi
+*.exe
+*.nsis.zip
+
+# Local overrides and screenshots in progress
+.env
+.env.*
+captures-wip/
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/*
+!.vscode/extensions.json
