@@ -305,7 +305,8 @@ export function warningBand(list: Warning[], showAll: boolean): string {
 }
 
 export function eventsPanel(events: SlotEvent[], now: Date): string {
-  const items = [...events].reverse().slice(0, 20);
+  // Newest first whatever order the core sends (0.4 sends newest first, at most 20).
+  const items = [...events].sort((a, b) => (Date.parse(b.time) || 0) - (Date.parse(a.time) || 0)).slice(0, 20);
   const body = items.length
     ? items
         .map((e) => {
