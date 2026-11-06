@@ -26,14 +26,14 @@ The widget is **read-only**. It never opens, closes or leases a slot. `unity-slo
 |---|---|
 | Header | Open editors / maximum (`maxEditors`), system commit % (85% warning, 90% critical) |
 | Warning band | An editor open without a lease, an expired lease on an open editor, a stalled start, an unsaved scene, old local-only commits, and more. Click to see them all |
-| Slot card | State dot, name, platform, always-on / user / worktree tags, branch, state and time, lease, memory, git pills |
+| Slot card | State dot, name, platform, always-on / user / worktree tags, branch, state and time, lease, memory, git marks |
 | Footer | Updated time, next check, last fetch, unregistered editors and orphan workers, unity-slot version |
 
 **State dot:** ● ready · ◐ starting · red ● stalled · ○ closed · ■ batch · dim ● open (started by the Hub, readiness unknown) · dashed ○ path missing
 
-**git pills:**
+**git marks:**
 
-| Pill | Meaning |
+| Mark | Meaning |
 |---|---|
 | `● 12` | Uncommitted changes |
 | `↑ 1` · `↓ 2` | Ahead of / behind upstream (as of the last fetch) |
