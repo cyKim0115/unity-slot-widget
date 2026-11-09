@@ -33,6 +33,7 @@
   --tint-hot-line: rgba(224, 82, 74, 0.25);
   --menu: rgba(18, 20, 24, 0.98);
   --on-accent: #16181c;
+  --window-edge: rgba(255, 255, 255, 0.12);
   --shadow: 0 10px 24px rgba(0, 0, 0, 0.35);
   font-family: "Segoe UI", "Malgun Gothic", sans-serif;
 }
@@ -61,6 +62,7 @@
     --tint-hot-line: rgba(180, 35, 24, 0.22);
     --menu: rgba(255, 255, 255, 0.98);
     --on-accent: #ffffff;
+    --window-edge: rgba(15, 23, 42, 0.18);
     --shadow: 0 10px 24px rgba(0, 0, 0, 0.14);
   }
 }
@@ -778,6 +780,18 @@ body.settings-body {
   background: var(--card-solid);
   overflow: auto;
   user-select: text;
+}
+
+/* Window edge. Without the OS title bar, Windows 10 draws almost no shadow along the top, so the
+   window melts into what is behind it. A 1px line on the inside edge gives all four sides a border.
+   Fixed, so it stays above the sticky title bar while scrolling; it does not block clicks or resizing. */
+body.settings-body::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 10;
+  border: 1px solid var(--window-edge);
+  pointer-events: none;
 }
 
 .settings {
