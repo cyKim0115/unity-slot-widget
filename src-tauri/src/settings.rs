@@ -28,6 +28,8 @@ pub struct WidgetSettings {
     pub slot_memory_warn_gb: f64,
     pub local_only_warn_days: u32,
     pub local_only_critical_days: u32,
+    /// Program for a slot card's right-click > Open: one of `open::OPEN_TARGETS` (default fork).
+    pub open_target: String,
     /// Empty: find the core through install.json, then PATH.
     pub unity_slot_script: String,
     /// Developers and screenshots only: read this dashboard JSON instead of running the core.
@@ -50,6 +52,7 @@ impl Default for WidgetSettings {
             slot_memory_warn_gb: 10.0,
             local_only_warn_days: 3,
             local_only_critical_days: 14,
+            open_target: crate::open::OPEN_TARGETS[0].into(),
             unity_slot_script: String::new(),
             sample_file: String::new(),
         }
@@ -67,6 +70,9 @@ impl WidgetSettings {
         self.glass_blur = self.glass_blur.clamp(0.0, crate::glass::MAX_BLUR_PX);
         if !matches!(self.language.as_str(), "auto" | "ko" | "en") {
             self.language = "auto".into();
+        }
+        if !crate::open::OPEN_TARGETS.contains(&self.open_target.as_str()) {
+            self.open_target = crate::open::OPEN_TARGETS[0].into();
         }
         self
     }

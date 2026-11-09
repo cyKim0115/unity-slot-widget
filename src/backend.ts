@@ -24,6 +24,7 @@ const PREVIEW_SETTINGS = {
   slotMemoryWarnGb: 10,
   localOnlyWarnDays: 3,
   localOnlyCriticalDays: 14,
+  openTarget: "fork",
   unitySlotScript: "",
   sampleFile: "",
 };

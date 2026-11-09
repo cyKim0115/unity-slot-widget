@@ -1,6 +1,7 @@
 /**
  * Widget window. Read-only: it shows what `unity-slot dashboard -Json` reports and never opens,
- * closes or leases a slot.
+ * closes or leases a slot. Right-click > Open on a slot card only opens its folder in another
+ * program (Fork by default); it never starts Unity.
  *
  * Refresh rhythm
  * - full check (`dashboard -Json -Git basic`): every `idleSecs`, every `startingSecs` while an
@@ -15,7 +16,7 @@ import { setGlassBlur, setGlassClass, onGlassFrame, type GlassFrame } from "./gl
 import { currentLang, formatClock, formatDuration, formatWhen, resolveLang, setLang, t } from "./i18n";
 import { icon } from "./icons";
 import { cleanupRequest, elapsedSince, isOpen, mergeGit, nowFor, warnings } from "./model";
-import type { Dashboard, DashboardResult, GitState, Slot, WidgetSettings } from "./types";
+import type { Dashboard, DashboardResult, GitState, OpenTarget, Slot, WidgetSettings } from "./types";
 import { SUPPORTED_SCHEMA_MAJOR } from "./types";
 import { esc, eventsPanel, headerPills, slotList, warningBand } from "./view";
 
@@ -33,6 +34,8 @@ let lastFullAt = 0;
 const expanded = new Set<string>();
 let showAllWarnings = false;
 let showEvents = false;
+/** The slot whose card was right-clicked while the slot menu is up. */
+let menuSlot: Slot | null = null;
 
 let running = false;
 let pending: { full: boolean } | null = null;
@@ -307,8 +310,10 @@ async function copyCleanup() {
   if (await copyText(text)) toast(t("toast.cleanupCopied"));
 }
 
-function showMenu(x: number, y: number) {
-  const menu = $("menu");
+/** `menu`: the widget menu. `slot-menu`: the menu of the right-clicked slot card. */
+function showMenu(id: "menu" | "slot-menu", x: number, y: number) {
+  const menu = $(id);
+  $(id === "menu" ? "slot-menu" : "menu").classList.add("hidden");
   $("menu-backdrop").classList.remove("hidden");
   menu.classList.remove("hidden");
   const w = menu.offsetWidth;
@@ -319,7 +324,48 @@ function showMenu(x: number, y: number) {
 
 function hideMenu() {
   $("menu").classList.add("hidden");
+  $("slot-menu").classList.add("hidden");
   $("menu-backdrop").classList.add("hidden");
+  menuSlot = null;
+}
+
+/** The slot card under the pointer. An open menu's backdrop covers the page, so look beneath it. */
+function slotAt(e: MouseEvent): Slot | null {
+  const under = document.elementsFromPoint(e.clientX, e.clientY).find((el) => !el.closest("#menu-backdrop"));
+  const name = under?.closest<HTMLElement>("li.slot[data-toggle]")?.dataset.toggle;
+  return name ? ((doc?.slots ?? []).find((s) => s.name === name) ?? null) : null;
+}
+
+function onContextMenu(e: MouseEvent) {
+  e.preventDefault();
+  // A right-click on an open menu leaves it as it is.
+  if ((e.target as Element).closest(".menu")) return;
+  const slot = slotAt(e);
+  if (!slot) {
+    menuSlot = null;
+    showMenu("menu", e.clientX, e.clientY);
+    return;
+  }
+  menuSlot = slot;
+  const target = settings.openTarget;
+  $("menu-slot-open").textContent = t("menu.open", { app: t(`open.${target}`) });
+  // Open already is Explorer: one item is enough.
+  $("menu-slot-explorer").classList.toggle("hidden", target === "explorer");
+  showMenu("slot-menu", e.clientX, e.clientY);
+}
+
+function openError(code: string, target: OpenTarget): string {
+  if (code === "not-found") return t("toast.notFound");
+  if (code === "app-not-found") return t("toast.appNotFound", { app: t(`open.${target}`) });
+  return t("toast.openFailed", { text: code.replace(/^spawn:/, "") });
+}
+
+async function openSlot(slot: Slot, target: OpenTarget) {
+  try {
+    await call("open_with", { path: slot.path, target });
+  } catch (e) {
+    toast(openError(String(e), target));
+  }
 }
 
 function applyTexts() {
@@ -329,6 +375,7 @@ function applyTexts() {
   $("menu-cleanup").textContent = t("menu.cleanup");
   $("menu-events").textContent = t("menu.events");
   $("menu-quit").textContent = t("menu.quit");
+  $("menu-slot-explorer").textContent = t("menu.openExplorer");
   void call("set_tray_labels", {
     labels: { show: t("tray.show"), hide: t("tray.hide"), settings: t("tray.settings"), quit: t("tray.quit") },
   }).catch(() => {});
@@ -376,10 +423,7 @@ async function boot() {
       render();
     }
   });
-  document.addEventListener("contextmenu", (e) => {
-    e.preventDefault();
-    showMenu(e.clientX, e.clientY);
-  });
+  document.addEventListener("contextmenu", onContextMenu);
   $("menu-backdrop").addEventListener("click", hideMenu);
   window.addEventListener("blur", hideMenu);
   window.addEventListener("keydown", (e) => {
@@ -403,6 +447,16 @@ async function boot() {
     render();
   });
   $("menu-quit").addEventListener("click", () => void call("quit_app"));
+  $("menu-slot-open").addEventListener("click", () => {
+    const slot = menuSlot;
+    hideMenu();
+    if (slot) void openSlot(slot, settings.openTarget);
+  });
+  $("menu-slot-explorer").addEventListener("click", () => {
+    const slot = menuSlot;
+    hideMenu();
+    if (slot) void openSlot(slot, "explorer");
+  });
 
   await on("slot-signal", onSignal);
   await on("widget-shown", () => void refresh(false));

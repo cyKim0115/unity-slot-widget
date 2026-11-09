@@ -146,6 +146,10 @@ export interface DashboardResult {
   script?: string | null;
 }
 
+/** Programs a slot folder can be opened with (right-click > Open). The first is the default. */
+export const OPEN_TARGETS = ["fork", "cmd", "git_bash", "cursor", "vscode", "explorer"] as const;
+export type OpenTarget = (typeof OPEN_TARGETS)[number];
+
 export interface WidgetSettings {
   language: "auto" | "ko" | "en";
   alwaysOnTop: boolean;
@@ -160,6 +164,7 @@ export interface WidgetSettings {
   slotMemoryWarnGb: number;
   localOnlyWarnDays: number;
   localOnlyCriticalDays: number;
+  openTarget: OpenTarget;
   unitySlotScript: string;
   sampleFile: string;
 }

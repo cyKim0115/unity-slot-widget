@@ -1,7 +1,7 @@
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { call, inTauri, on } from "./backend";
 import { resolveLang, setLang, t } from "./i18n";
-import type { CoreLocation, WidgetSettings } from "./types";
+import { OPEN_TARGETS, type CoreLocation, type OpenTarget, type WidgetSettings } from "./types";
 
 const NUMBER_FIELDS = [
   "idleSecs",
@@ -21,6 +21,10 @@ let loaded: WidgetSettings;
 
 function input(id: string): HTMLInputElement {
   return document.getElementById(id) as HTMLInputElement;
+}
+
+function select(id: string): HTMLSelectElement {
+  return document.getElementById(id) as HTMLSelectElement;
 }
 
 function applyTexts() {
@@ -51,7 +55,8 @@ async function showLocation() {
 }
 
 function fill(s: WidgetSettings) {
-  (document.getElementById("language") as HTMLSelectElement).value = s.language;
+  select("language").value = s.language;
+  select("openTarget").value = s.openTarget;
   for (const key of BOOL_FIELDS) input(key).checked = s[key];
   for (const key of NUMBER_FIELDS) input(key).value = String(s[key]);
   for (const key of TEXT_FIELDS) input(key).value = s[key];
@@ -60,7 +65,9 @@ function fill(s: WidgetSettings) {
 
 function read(): WidgetSettings {
   const s: WidgetSettings = { ...loaded };
-  s.language = (document.getElementById("language") as HTMLSelectElement).value as WidgetSettings["language"];
+  s.language = select("language").value as WidgetSettings["language"];
+  const target = select("openTarget").value as OpenTarget;
+  if (OPEN_TARGETS.includes(target)) s.openTarget = target;
   for (const key of BOOL_FIELDS) s[key] = input(key).checked;
   for (const key of NUMBER_FIELDS) {
     const v = Number(input(key).value);

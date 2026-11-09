@@ -52,6 +52,12 @@ fn open_log(path: String) -> Result<(), String> {
     open::open_log(&path)
 }
 
+/// A slot card's right-click > Open: the folder in Fork, a terminal, an editor or Explorer.
+#[tauri::command]
+fn open_with(path: String, target: String) -> Result<(), String> {
+    open::open_with(&path, &target)
+}
+
 #[tauri::command]
 fn set_tray_labels(app: tauri::AppHandle, labels: tray::TrayLabels) -> Result<(), String> {
     tray::set_labels(&app, &labels)
@@ -173,6 +179,7 @@ pub fn run() {
             get_dashboard,
             open_folder,
             open_log,
+            open_with,
             set_tray_labels,
             quit_app,
             open_settings_window,

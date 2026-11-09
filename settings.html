@@ -32,6 +32,22 @@
       </section>
 
       <section>
+        <h2 data-t="settings.open"></h2>
+        <label class="field"
+          ><span data-t="settings.openTarget"></span>
+          <select id="openTarget">
+            <option value="fork" data-t="open.fork"></option>
+            <option value="cmd" data-t="open.cmd"></option>
+            <option value="git_bash" data-t="open.git_bash"></option>
+            <option value="cursor" data-t="open.cursor"></option>
+            <option value="vscode" data-t="open.vscode"></option>
+            <option value="explorer" data-t="open.explorer"></option>
+          </select></label
+        >
+        <p class="hint" data-t="settings.openHint"></p>
+      </section>
+
+      <section>
         <h2 data-t="settings.look"></h2>
         <label class="field"><span data-t="settings.glass"></span><input id="glass" type="checkbox" /></label>
         <label class="field"><span id="glassBlurLabel"></span><input id="glassBlur" type="range" min="0" max="32" step="1" /></label>
