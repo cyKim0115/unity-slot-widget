@@ -52,6 +52,8 @@ Click a card to open its details. You get the path (open folder, open log, copy 
 
 The right-click menu has Settings, Refresh, **Copy cleanup request**, Recent events and Quit. Copy cleanup request puts a Markdown checklist of the items that need attention on the clipboard: commits on no remote, branches without an upstream, stashes, editors open without a lease. Paste it into any agent session; the agent asks what to do with each item and does only what you approve.
 
+Right-click a slot card for **Open** and Show in Explorer. Open opens the slot folder in Fork by default; Settings can switch it to Command Prompt, Git Bash, Cursor, VS Code or File Explorer. It opens the folder only and never starts the Unity editor.
+
 With a light system theme the widget turns light too. The text comes in Korean and English and follows the system language by default.
 
 <p align="center">
@@ -144,6 +146,7 @@ Open them from the tray icon or the widget's right-click menu. They are saved to
 |---|---|---|
 | Language | System language | Korean or English |
 | Always on top | On | Above other windows |
+| Program for right-click → Open | **Fork** | Command Prompt, Git Bash, Cursor, VS Code, File Explorer |
 | Start with Windows | **Off** | Only in the installed app |
 | Background blur | Off | Captures the screen behind the widget and blurs it. While it captures, the widget is left out of screenshots |
 | Full check interval / while starting | 30 s / 5 s | |
