@@ -1,6 +1,6 @@
 [package]
 name = "unity-slot-widget"
-version = "0.1.1"
+version = "0.1.2"
 description = "Desktop widget that shows unity-slot slots, editors, leases and memory"
 authors = ["cyKim0115"]
 license = "MIT"
