@@ -5,7 +5,7 @@
 ![License: MIT](https://img.shields.io/badge/license-MIT-567e65)
 ![Windows 10 · 11](https://img.shields.io/badge/Windows-10%20%C2%B7%2011-3f6150)
 ![Tauri 2](https://img.shields.io/badge/Tauri-2-3f6150)
-![Read-only](https://img.shields.io/badge/mode-read--only-96bea1)
+![View · open](https://img.shields.io/badge/mode-view%20%C2%B7%20open-96bea1)
 
 [unity-slot](https://github.com/cyKim0115/unity-slot)과 함께 쓰는 작은 데스크톱 위젯입니다. Unity 클론(슬롯)마다 다음을 한눈에 보여 줍니다.
 
@@ -18,7 +18,7 @@
   <img src="docs/assets/widget-ko.png" width="400" alt="Unity 슬롯 위젯: MyGame과 Popup 두 프로젝트의 슬롯 8개가 카드로 보이고, 위쪽 경고 띠에 원격에 없는 커밋 경고가 두 줄 있다">
 </p>
 
-위젯은 **읽기 전용**입니다. 슬롯을 열거나 닫거나 임대하지 않습니다. 판단은 모두 `unity-slot dashboard -Json`이 하고, 위젯은 그 문서를 그리기만 합니다. 스크린샷은 [예시 데이터](samples/)로 찍었습니다.
+위젯은 슬롯을 닫거나 임대하지 않습니다. 에디터를 띄우는 것은 슬롯 카드 우클릭 → **Unity로 열기** 하나뿐이고, 그것도 unity-slot의 `open -NoWait`를 부를 뿐이라 열기 전 검사와 띄우는 방식은 코어가 정합니다. 그 밖의 판단은 모두 `unity-slot dashboard -Json`이 하고, 위젯은 그 문서를 그립니다. 스크린샷은 [예시 데이터](samples/)로 찍었습니다.
 
 ## 보여 주는 것
 
@@ -52,7 +52,10 @@
 
 우클릭 메뉴에는 설정, 새로고침, **정리 요청 복사**, 최근 이벤트, 종료가 있습니다. 정리 요청 복사는 주의할 항목을 마크다운 체크리스트로 클립보드에 넣습니다. 원격에 없는 커밋, upstream 없는 브랜치, stash, 임대 없이 열린 에디터 같은 것이에요. 아무 에이전트 세션에 붙여 넣으면, 에이전트가 항목마다 무엇을 할지 묻고 승인한 것만 처리합니다.
 
-슬롯 카드를 우클릭하면 **열기**와 탐색기에서 열기가 나옵니다. 열기는 그 슬롯 폴더를 Fork로 엽니다(기본값). 설정에서 명령 프롬프트, Git Bash, Cursor, VS Code, 탐색기로 바꿀 수 있어요. 폴더만 열고 Unity 에디터는 열지 않습니다.
+슬롯 카드를 우클릭하면 **Unity로 열기**, **열기**, 탐색기에서 열기가 나옵니다.
+
+- **Unity로 열기**는 그 슬롯의 에디터를 띄웁니다. `unity-slot open <슬롯> -NoWait`를 부르므로 이미 열렸는지, batch 실행·잠긴 `Temp\UnityLockfile`·설치 안 된 Unity 버전 검사와 WMI 실행, 수용량 경고가 코어 그대로 적용돼요. 플랫폼(`-BuildTarget`)은 넘기지 않습니다. 이미 열린 슬롯에서는 **Unity 창 보기**로 바뀌어 그 창을 앞으로 가져옵니다. 남이 임대한 닫힌 슬롯, 폴더가 없는 슬롯, batch 실행 중인 슬롯에서는 꺼져 있어요. 임대는 잡지 않으니 위젯으로 연 온디맨드 슬롯에는 「임대 없이 열림」이 붙습니다.
+- **열기**는 그 슬롯 폴더를 Fork로 엽니다(기본값). 설정에서 명령 프롬프트, Git Bash, Cursor, VS Code, 탐색기로 바꿀 수 있어요.
 
 시스템이 라이트 테마면 위젯도 라이트로 바뀝니다. 화면 글자는 한국어·영어 두 벌이고, 기본은 시스템 언어를 따릅니다.
 
@@ -101,6 +104,7 @@ flowchart LR
     cli -- "열기 · 닫기" --> editor["Unity 에디터"]
     cli <--> state[("상태 폴더")]
     cli -- "dashboard -Json" --> widget["Unity Slot Widget"]
+    widget -- "우클릭 → Unity로 열기: open -NoWait" --> cli
     person -. "곁눈으로 확인" .-> widget
 ```
 
@@ -159,7 +163,7 @@ Tauri 없이 화면만 보려면 `npm run dev`를 실행한 뒤 브라우저에�
 
 ## 하지 않는 것
 
-- 슬롯 열기·닫기·임대, 프로세스 종료, git 쓰기(fetch·pull·push 포함)
+- 슬롯 닫기·임대, 프로세스 종료, git 쓰기(fetch·pull·push 포함). Unity.exe를 직접 띄우지도 않습니다. Unity로 열기는 unity-slot `open`이 합니다.
 - 네트워크 통신, 로컬 포트 열기. 화면과 Rust 사이는 Tauri IPC만 씁니다.
 - 명령줄 표시. unity-slot의 dashboard 출력에는 명령줄이 없습니다(Hub 토큰 등).
 - 기본으로 자동 시작하기

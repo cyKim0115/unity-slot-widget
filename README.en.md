@@ -5,7 +5,7 @@
 ![License: MIT](https://img.shields.io/badge/license-MIT-567e65)
 ![Windows 10 · 11](https://img.shields.io/badge/Windows-10%20%C2%B7%2011-3f6150)
 ![Tauri 2](https://img.shields.io/badge/Tauri-2-3f6150)
-![Read-only](https://img.shields.io/badge/mode-read--only-96bea1)
+![View · open](https://img.shields.io/badge/mode-view%20%C2%B7%20open-96bea1)
 
 A small desktop widget for [unity-slot](https://github.com/cyKim0115/unity-slot). For each Unity clone (slot) it shows at a glance:
 
@@ -18,7 +18,7 @@ A small desktop widget for [unity-slot](https://github.com/cyKim0115/unity-slot)
   <img src="docs/assets/widget-en.png" width="400" alt="Unity Slot Widget: eight slot cards from two projects, MyGame and Popup, with a warning band about commits on no remote at the top">
 </p>
 
-The widget is **read-only**. It never opens, closes or leases a slot. `unity-slot dashboard -Json` makes every decision and the widget only draws that document. The screenshots use [sample data](samples/).
+The widget never closes or leases a slot. The one thing that starts an editor is a slot card's right-click → **Open in Unity**, and even that only calls unity-slot's `open -NoWait`, so the core makes the checks and starts the editor its own way. `unity-slot dashboard -Json` makes every other decision and the widget draws that document. The screenshots use [sample data](samples/).
 
 ## What it shows
 
@@ -52,7 +52,10 @@ Click a card to open its details. You get the path (open folder, open log, copy 
 
 The right-click menu has Settings, Refresh, **Copy cleanup request**, Recent events and Quit. Copy cleanup request puts a Markdown checklist of the items that need attention on the clipboard: commits on no remote, branches without an upstream, stashes, editors open without a lease. Paste it into any agent session; the agent asks what to do with each item and does only what you approve.
 
-Right-click a slot card for **Open** and Show in Explorer. Open opens the slot folder in Fork by default; Settings can switch it to Command Prompt, Git Bash, Cursor, VS Code or File Explorer. It opens the folder only and never starts the Unity editor.
+Right-click a slot card for **Open in Unity**, **Open** and Show in Explorer.
+
+- **Open in Unity** starts the slot's editor. It calls `unity-slot open <slot> -NoWait`, so the core's checks (already open, batchmode run, held `Temp\UnityLockfile`, Unity version not installed), its WMI launch and its capacity warnings all apply. No platform (`-BuildTarget`) is passed. On an open slot it becomes **Show Unity window** and brings that window to the front. It is off for a closed slot someone else leased, a slot whose folder is missing and a slot in a batchmode run. It takes no lease, so an on-demand slot opened from the widget shows "open without a lease".
+- **Open** opens the slot folder in Fork by default; Settings can switch it to Command Prompt, Git Bash, Cursor, VS Code or File Explorer.
 
 With a light system theme the widget turns light too. The text comes in Korean and English and follows the system language by default.
 
@@ -101,6 +104,7 @@ flowchart LR
     cli -- "open · close" --> editor["Unity editors"]
     cli <--> state[("State folder")]
     cli -- "dashboard -Json" --> widget["Unity Slot Widget"]
+    widget -- "right-click → Open in Unity: open -NoWait" --> cli
     person -. "glance" .-> widget
 ```
 
@@ -159,7 +163,7 @@ Open them from the tray icon or the widget's right-click menu. They are saved to
 
 ## What it does not do
 
-- Open, close or lease slots, end processes, or write to git (including fetch, pull and push)
+- Close or lease slots, end processes, or write to git (including fetch, pull and push). It never starts Unity.exe itself either; unity-slot's `open` does that for Open in Unity.
 - Talk to the network or open a local port. The page and Rust talk over Tauri IPC only.
 - Show command lines. unity-slot's dashboard output has none (Hub tokens and the like).
 - Start automatically by default
