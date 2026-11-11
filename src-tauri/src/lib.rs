@@ -58,6 +58,21 @@ fn open_with(path: String, target: String) -> Result<(), String> {
     open::open_with(&path, &target)
 }
 
+/// A slot card's right-click > Open in Unity: `unity-slot open <slot path> -NoWait` through the core.
+#[tauri::command]
+async fn open_in_unity(path: String) -> Result<core::OpenResult, String> {
+    let s = settings::load();
+    tauri::async_runtime::spawn_blocking(move || core::open_slot(&s.unity_slot_script, &path))
+        .await
+        .map_err(|e| e.to_string())?
+}
+
+/// A slot card's right-click > Show Unity window, for an editor that is already open.
+#[tauri::command]
+fn focus_editor(pid: u32) -> Result<(), String> {
+    open::focus_window(pid)
+}
+
 #[tauri::command]
 fn set_tray_labels(app: tauri::AppHandle, labels: tray::TrayLabels) -> Result<(), String> {
     tray::set_labels(&app, &labels)
@@ -180,6 +195,8 @@ pub fn run() {
             open_folder,
             open_log,
             open_with,
+            open_in_unity,
+            focus_editor,
             set_tray_labels,
             quit_app,
             open_settings_window,

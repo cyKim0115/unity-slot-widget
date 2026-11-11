@@ -747,6 +747,15 @@ html.glass .list-wrap.fade-top.fade-bottom .list {
   background: var(--surface-strong);
 }
 
+.menu-item:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.menu-item:disabled:hover {
+  background: transparent;
+}
+
 .menu-item.danger {
   color: var(--danger-text);
 }

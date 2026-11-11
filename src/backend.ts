@@ -42,6 +42,8 @@ async function preview(cmd: string): Promise<unknown> {
     }
     case "get_core_location":
       return { script: null, source: "none", slotHome: "(preview)" };
+    case "open_in_unity":
+      return { outcome: "started", pid: null, warnings: [] };
     case "set_glass":
     case "glass_supported":
     case "is_dev_build":

@@ -1,13 +1,18 @@
 //! Read-only helpers: open a slot folder in Fork, a terminal, an editor or Explorer, open its
-//! editor log. Nothing here changes a slot, an editor or a repository, and nothing starts Unity.
+//! editor log, bring an open editor's window to the front. Nothing here changes a slot, an editor
+//! or a repository, and nothing starts Unity (Open in Unity goes through the core: core.rs).
 
 use std::os::windows::process::CommandExt;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
-use windows::core::{HSTRING, PCWSTR};
+use windows::core::{BOOL, HSTRING, PCWSTR};
+use windows::Win32::Foundation::{HWND, LPARAM, RECT};
 use windows::Win32::UI::Shell::ShellExecuteW;
-use windows::Win32::UI::WindowsAndMessaging::SW_SHOWNORMAL;
+use windows::Win32::UI::WindowsAndMessaging::{
+    EnumWindows, GetWindow, GetWindowRect, GetWindowThreadProcessId, IsIconic, IsWindowVisible,
+    SetForegroundWindow, ShowWindow, GW_OWNER, SW_RESTORE, SW_SHOWNORMAL,
+};
 
 /// Programs a slot folder can be opened with (`openTarget` in widget.json). The first is the default.
 pub const OPEN_TARGETS: [&str; 6] = ["fork", "cmd", "git_bash", "cursor", "vscode", "explorer"];
@@ -78,6 +83,55 @@ pub fn open_with(path: &str, target: &str) -> Result<(), String> {
             spawn(Command::new(exe).arg(&dir))
         }
     }
+}
+
+/// Brings an open editor's window to the front (right-click > Show Unity window); a minimized one
+/// is restored. The window: the largest visible top-level window of `pid` that has no owner.
+/// The widget was just clicked, so Windows lets it hand the foreground over.
+/// Errors: `window-not-found`.
+pub fn focus_window(pid: u32) -> Result<(), String> {
+    let hwnd = main_window(pid).ok_or_else(|| "window-not-found".to_string())?;
+    unsafe {
+        if IsIconic(hwnd).as_bool() {
+            let _ = ShowWindow(hwnd, SW_RESTORE);
+        }
+        let _ = SetForegroundWindow(hwnd);
+    }
+    Ok(())
+}
+
+struct WindowSearch {
+    pid: u32,
+    best: Option<(HWND, i64)>,
+}
+
+fn main_window(pid: u32) -> Option<HWND> {
+    if pid == 0 {
+        return None;
+    }
+    let mut search = WindowSearch { pid, best: None };
+    unsafe {
+        let _ = EnumWindows(Some(visit_window), LPARAM(&mut search as *mut WindowSearch as isize));
+    }
+    search.best.map(|(hwnd, _)| hwnd)
+}
+
+unsafe extern "system" fn visit_window(hwnd: HWND, lparam: LPARAM) -> BOOL {
+    let search = unsafe { &mut *(lparam.0 as *mut WindowSearch) };
+    let mut owner_pid = 0u32;
+    unsafe { GetWindowThreadProcessId(hwnd, Some(&mut owner_pid)) };
+    // GetWindow fails when the window has no owner: a main window, not a dialog or tool window.
+    if owner_pid != search.pid || !unsafe { IsWindowVisible(hwnd) }.as_bool() || unsafe { GetWindow(hwnd, GW_OWNER) }.is_ok() {
+        return BOOL(1);
+    }
+    let mut r = RECT::default();
+    if unsafe { GetWindowRect(hwnd, &mut r) }.is_ok() {
+        let area = i64::from(r.right - r.left) * i64::from(r.bottom - r.top);
+        if search.best.map_or(true, |(_, best)| area > best) {
+            search.best = Some((hwnd, area));
+        }
+    }
+    BOOL(1)
 }
 
 fn spawn(cmd: &mut Command) -> Result<(), String> {
@@ -192,6 +246,11 @@ mod tests {
     fn missing_folder_is_not_found() {
         let dir = missing("slot");
         assert_eq!(open_with(&dir.to_string_lossy(), "fork"), Err("not-found".to_string()));
+    }
+
+    #[test]
+    fn no_window_for_a_missing_process() {
+        assert_eq!(focus_window(0), Err("window-not-found".to_string()));
     }
 
     #[test]

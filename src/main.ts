@@ -1,7 +1,10 @@
 /**
- * Widget window. Read-only: it shows what `unity-slot dashboard -Json` reports and never opens,
- * closes or leases a slot. Right-click > Open on a slot card only opens its folder in another
- * program (Fork by default); it never starts Unity.
+ * Widget window. It shows what `unity-slot dashboard -Json` reports and never closes or leases a
+ * slot. A slot card's right-click menu:
+ * - Open in Unity: `unity-slot open <slot> -NoWait` through the core, which makes the checks and
+ *   starts the editor (the widget never runs Unity.exe itself). Off for a leased, missing or
+ *   batchmode slot; on an open slot it becomes Show Unity window (brings it to the front).
+ * - Open: the folder in another program (Fork by default). Show in Explorer.
  *
  * Refresh rhythm
  * - full check (`dashboard -Json -Git basic`): every `idleSecs`, every `startingSecs` while an
@@ -16,7 +19,7 @@ import { setGlassBlur, setGlassClass, onGlassFrame, type GlassFrame } from "./gl
 import { currentLang, formatClock, formatDuration, formatWhen, resolveLang, setLang, t } from "./i18n";
 import { icon } from "./icons";
 import { cleanupRequest, elapsedSince, isOpen, mergeGit, nowFor, warnings } from "./model";
-import type { Dashboard, DashboardResult, GitState, OpenTarget, Slot, WidgetSettings } from "./types";
+import type { Dashboard, DashboardResult, GitState, OpenResult, OpenTarget, Slot, WidgetSettings } from "./types";
 import { SUPPORTED_SCHEMA_MAJOR } from "./types";
 import { esc, eventsPanel, headerPills, slotList, warningBand } from "./view";
 
@@ -251,11 +254,14 @@ function fitHeight() {
 
 // ---------------------------------------------------------------- actions
 
-function toast(text: string) {
+let toastTimer: number | undefined;
+/** A new toast replaces the one on screen and gets its own time. */
+function toast(text: string, ms = 2200) {
   const el = $("toast");
   el.textContent = text;
   el.classList.add("show");
-  window.setTimeout(() => el.classList.remove("show"), 2200);
+  window.clearTimeout(toastTimer);
+  toastTimer = window.setTimeout(() => el.classList.remove("show"), ms);
 }
 
 async function copyText(text: string): Promise<boolean> {
@@ -347,6 +353,11 @@ function onContextMenu(e: MouseEvent) {
     return;
   }
   menuSlot = slot;
+  const unity = unityAction(slot);
+  const unityItem = $("menu-slot-unity") as HTMLButtonElement;
+  unityItem.textContent =
+    unity.kind === "open" ? t("menu.openUnity") : unity.kind === "focus" ? t("menu.focusUnity") : t("menu.openUnityOff", { reason: unity.reason });
+  unityItem.disabled = unity.kind === "off";
   const target = settings.openTarget;
   $("menu-slot-open").textContent = t("menu.open", { app: t(`open.${target}`) });
   // Open already is Explorer: one item is enough.
@@ -358,6 +369,75 @@ function openError(code: string, target: OpenTarget): string {
   if (code === "not-found") return t("toast.notFound");
   if (code === "app-not-found") return t("toast.appNotFound", { app: t(`open.${target}`) });
   return t("toast.openFailed", { text: code.replace(/^spawn:/, "") });
+}
+
+/** Right-click > Unity on this slot: start its editor, bring an open one to the front, or nothing (why). */
+type UnityAction = { kind: "open" } | { kind: "focus"; pid: number } | { kind: "off"; reason: string };
+
+function unityAction(slot: Slot): UnityAction {
+  // Sample slots are not on this PC.
+  if (lastResult?.source === "sample") return { kind: "off", reason: t("unity.offSample") };
+  const state = slot.editor?.state ?? "closed";
+  if (slot.exists === false || state === "missing" || (slot.flags ?? []).includes("missing-path")) {
+    return { kind: "off", reason: t("unity.offMissing") };
+  }
+  if (state === "batch") return { kind: "off", reason: t("unity.offBatch") };
+  if (isOpen(slot)) {
+    const pid = slot.editor?.pid;
+    return pid ? { kind: "focus", pid } : { kind: "off", reason: t("unity.offOpen") };
+  }
+  // A closed slot someone holds (acquire -NoOpen, or a lease left after closing) is theirs to open.
+  const lease = slot.lease;
+  if (lease && !lease.expired) return { kind: "off", reason: t("unity.offLeased", { owner: lease.owner }) };
+  return { kind: "open" };
+}
+
+function unityError(code: string): string {
+  const [kind, ...rest] = code.split(":");
+  const text = rest.join(":");
+  switch (kind) {
+    case "not-found":
+      return t("toast.notFound");
+    case "busy":
+      return t("toast.unityBusy");
+    case "core-not-found":
+      return t("error.core-not-found");
+    case "timeout":
+      return t("toast.unityTimeout");
+    case "unity-missing":
+      return t("toast.unityMissing", { version: text || "?" });
+    case "batch-busy":
+      return t("toast.unityBatch");
+    case "lock-held":
+      return t("toast.unityLock");
+    case "window-not-found":
+      return t("toast.windowNotFound");
+    case "exit":
+      return t("toast.unityFailed", { text: rest.slice(1).join(":") || text });
+    default:
+      return t("toast.unityFailed", { text: text || code });
+  }
+}
+
+async function unitySlot(slot: Slot) {
+  const action = unityAction(slot);
+  if (action.kind === "focus") {
+    await call("focus_editor", { pid: action.pid }).catch((e) => toast(unityError(String(e))));
+    return;
+  }
+  if (action.kind !== "open") return;
+  // The core reads git and the commit charge first: a few seconds before the editor starts.
+  toast(t("toast.unityOpening", { slot: slot.name }), 90_000);
+  try {
+    const r = await call<OpenResult | null>("open_in_unity", { path: slot.path });
+    if (r?.outcome === "already-open") toast(t("toast.unityAlreadyOpen", { slot: slot.name }));
+    else if (r?.warnings?.length) toast(t("toast.unityStartedTight", { slot: slot.name }), 6000);
+    else toast(t("toast.unityStarted", { slot: slot.name }), 4000);
+  } catch (e) {
+    toast(unityError(String(e)), 5000);
+  }
+  // The card turns to "starting"; the refresh rhythm speeds up while it starts.
+  void refresh(false);
 }
 
 async function openSlot(slot: Slot, target: OpenTarget) {
@@ -447,6 +527,11 @@ async function boot() {
     render();
   });
   $("menu-quit").addEventListener("click", () => void call("quit_app"));
+  $("menu-slot-unity").addEventListener("click", () => {
+    const slot = menuSlot;
+    hideMenu();
+    if (slot) void unitySlot(slot);
+  });
   $("menu-slot-open").addEventListener("click", () => {
     const slot = menuSlot;
     hideMenu();

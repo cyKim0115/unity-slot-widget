@@ -146,6 +146,14 @@ export interface DashboardResult {
   script?: string | null;
 }
 
+/** `open_in_unity`: what `unity-slot open <slot> -NoWait` did. */
+export interface OpenResult {
+  outcome: "started" | "already-open" | "done" | string;
+  pid?: number | null;
+  /** `warn capacity: ...` lines from the core; it warns and opens anyway. */
+  warnings?: string[] | null;
+}
+
 /** Programs a slot folder can be opened with (right-click > Open). The first is the default. */
 export const OPEN_TARGETS = ["fork", "cmd", "git_bash", "cursor", "vscode", "explorer"] as const;
 export type OpenTarget = (typeof OPEN_TARGETS)[number];
