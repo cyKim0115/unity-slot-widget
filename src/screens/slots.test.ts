@@ -52,7 +52,7 @@ describe("slot list", () => {
     expect(parseKey(EXTRA_KEY)).toEqual({ kind: "extra" });
     expect(parseKey("e:4420")).toEqual({ kind: "editor", pid: 4420 });
     expect(parseKey("w:x")).toBeNull();
-    expect(parseKey("TeenipingTycoon-1")).toEqual({ kind: "slot", name: "TeenipingTycoon-1" });
+    expect(parseKey("MyAwesomeProject-1")).toEqual({ kind: "slot", name: "MyAwesomeProject-1" });
     expect(parseKey(null)).toBeNull();
   });
 
@@ -115,18 +115,18 @@ describe("slot list", () => {
 
   it("names a shared repository by the folder that holds it", () => {
     expect(repoLabel("C:\\repo\\MyGame\\.git")).toBe("MyGame");
-    expect(repoLabel("D:/hub/MyGame.git")).toBe("MyGame");
+    expect(repoLabel("C:/hub/MyGame.git")).toBe("MyGame");
   });
 });
 
 describe("names shortened in the middle", () => {
   it("keeps short names whole and the clone number of long ones", () => {
     expect(splitName("MyGame-1")).toEqual(["MyGame-1", ""]);
-    expect(splitName("TeenipingTycoon-1")).toEqual(["Teeniping", "Tycoon-1"]);
-    const [head, tail] = splitName("TeeniepingLittleTown-PopupDemo-3");
-    expect(head + tail).toBe("TeeniepingLittleTown-PopupDemo-3");
-    expect(tail).toBe("upDemo-3");
-    expect(splitName("TeeniepingLittleTown-PopupDemo")[1]).toBe("PopupDemo");
+    expect(splitName("MyAwesomeProject-1")).toEqual(["MyAwesomeP", "roject-1"]);
+    const [head, tail] = splitName("MyStudioCompany-ShowcaseDemo-3");
+    expect(head + tail).toBe("MyStudioCompany-ShowcaseDemo-3");
+    expect(tail).toBe("seDemo-3");
+    expect(splitName("MyStudioCompany-ShowcaseDemo")[1]).toBe("ShowcaseDemo");
   });
 
   it("escapes and keeps the whole name as the title", () => {

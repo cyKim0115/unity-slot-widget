@@ -44,7 +44,7 @@ function shortOwner(owner: string): string {
  */
 export function splitName(name: string): [string, string] {
   if (name.length < 16) return [name, ""];
-  // The last part after - or _ when it is a word of 9 to 12 letters (PopupDemo), else 8 characters
+  // The last part after - or _ when it is a word of 9 to 12 letters (ShowcaseDemo), else 8 characters
   const segment = name.length - Math.max(name.lastIndexOf("-"), name.lastIndexOf("_")) - 1;
   const tail = Math.min(Math.floor(name.length / 2), segment >= 9 && segment <= 12 ? segment : 8);
   return [name.slice(0, name.length - tail), name.slice(name.length - tail)];
