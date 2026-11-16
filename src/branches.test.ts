@@ -164,7 +164,7 @@ const doc: Dashboard = {
     {
       project: "me/mygame",
       repo: "MyGame",
-      path: "D:/view/MyGame.git",
+      path: "C:/Views/MyGame.git",
       updatedAt: "2026-11-16T11:20:00+09:00",
       slots: [
         { slot: "MyGame", remote: "MyGame", status: "fetched", changedSince: false },
@@ -254,7 +254,7 @@ describe("a project's branches", () => {
 
   it("finds the project's view repository, what changed since and the ref names", () => {
     const [mygame, other] = buildProjects(doc, full, gitOf, settings, NOW);
-    expect(mygame.view?.path).toBe("D:/view/MyGame.git");
+    expect(mygame.view?.path).toBe("C:/Views/MyGame.git");
     expect(other.view).toBeNull();
     expect(viewChanged(mygame.view)).toBe(2);
     const rec = mygame.groups.find((g) => g.name === "feature/rec")!;

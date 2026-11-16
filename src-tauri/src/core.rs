@@ -438,8 +438,8 @@ mod tests {
 
     #[test]
     fn branch_view_document_whatever_the_exit_code() {
-        let doc = r#"{"schema":"unity-slot.branch-view/1","version":"0.7.0","apply":false,"root":"D:\\v","views":[{"project":"me/mygame","exists":false,"action":"create","estimatedBytes":600000000}]}"#;
-        let r = branch_view_outcome(0, &format!("\u{feff}{doc}\n"), "[branch-view] root    D:\\v (dry run)\n").unwrap();
+        let doc = r#"{"schema":"unity-slot.branch-view/1","version":"0.7.0","apply":false,"root":"C:\\v","views":[{"project":"me/mygame","exists":false,"action":"create","estimatedBytes":600000000}]}"#;
+        let r = branch_view_outcome(0, &format!("\u{feff}{doc}\n"), "[branch-view] root    C:\\v (dry run)\n").unwrap();
         assert_eq!(r.exit_code, 0);
         assert_eq!(r.document["views"][0]["action"], "create");
         // A view that failed or was busy is in the document; the exit code says so
