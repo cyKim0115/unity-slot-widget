@@ -1,3 +1,4 @@
+/// <reference types="vitest/config" />
 import { defineConfig } from "vite";
 
 // @ts-expect-error process is a nodejs global
@@ -20,5 +21,9 @@ export default defineConfig(async () => ({
     host: host || false,
     hmr: host ? { protocol: "ws", host, port: 1432 } : undefined,
     watch: { ignored: ["**/src-tauri/**"] },
+  },
+  test: {
+    environment: "jsdom",
+    include: ["src/**/*.test.ts"],
   },
 }));
