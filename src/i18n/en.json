@@ -152,6 +152,7 @@
   "tray.show": "Show window",
   "tray.settings": "Settings",
   "tray.quit": "Quit",
+  "tray.stalled": "{n} stalled",
 
   "dur.s": "{n}s",
   "dur.m": "{n}m",

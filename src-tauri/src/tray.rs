@@ -72,6 +72,12 @@ pub fn set_labels(app: &AppHandle, labels: &TrayLabels) -> Result<(), String> {
     Ok(())
 }
 
+pub fn set_tooltip(app: &AppHandle, text: &str) {
+    if let Some(tray) = app.tray_by_id(TRAY_ID) {
+        let _ = tray.set_tooltip(Some(text));
+    }
+}
+
 fn on_menu_event(app: &AppHandle, event: MenuEvent) {
     match event.id().as_ref() {
         MENU_SHOW => show_widget(app),

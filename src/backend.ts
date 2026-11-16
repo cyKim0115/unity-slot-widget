@@ -58,6 +58,11 @@ export async function on<T>(event: string, handler: (payload: T) => void): Promi
   return listen<T>(event, (e) => handler(e.payload));
 }
 
+/**
+ * False only while the window is hidden to the tray (or not shown yet). A minimized window counts
+ * as visible (IsWindowVisible), so refreshing goes on while minimized and the taskbar badge and
+ * the tray tooltip stay current.
+ */
 export async function isWindowVisible(): Promise<boolean> {
   if (!inTauri) return true;
   try {

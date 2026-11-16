@@ -18,11 +18,15 @@
  * - detailed git (`-Git full`): every `gitFullMins`, and when a slot is selected and the last one is
  *   older than a minute;
  * - quick change signal: signals.rs, every `signalSecs` (Unity.exe ids + slot files);
- * - nothing while the window is hidden.
+ * - minimized, all of this goes on; nothing while the window is hidden to the tray.
+ *
+ * Out of sight, the tray tooltip, the taskbar badge and a taskbar flash for a new risk carry the
+ * state (glance.ts, `set_glance`). A setting changed in widget.json by someone else applies at once.
  */
 
 import { call, inTauri, isWindowVisible, on } from "./backend";
 import { applyDomTexts, currentLang, formatClock, formatDuration, formatGb, formatWhen, resolveLang, setLang, t } from "./i18n";
+import { glance, newRisks } from "./glance";
 import { cleanupRequest, elapsedSince, isOpen, mergeGit, nowFor, warnings, type Warning } from "./model";
 import { bodyMessage, logPanel, projectsPanel, slotBody, warningsPanel, type UnityButton } from "./panels";
 import { relabelBanner, setBannerFocusHome, showBanner, type BannerState } from "./shell/banner";
@@ -74,6 +78,12 @@ let timer: number | undefined;
 let nextAt = 0;
 let paused = false;
 let signalTimer: number | undefined;
+/** When the last refresh ended (a window shown again right after one skips another). */
+let refreshedAt = 0;
+/** What the tray and the taskbar show now, the risks already flashed for, and a flash to send. */
+let glanceSent = "";
+let knownRisks = new Set<string>();
+let flashPending = false;
 
 /** Screen state, kept per PC in localStorage (shell/prefs). */
 let selected: string | null = readPref("selected", null, isStringOrNull);
@@ -185,8 +195,10 @@ async function refresh(forceFull: boolean) {
     if (code !== "busy") lastError = code;
   } finally {
     running = false;
+    refreshedAt = Date.now();
     $("status-busy").hidden = true;
   }
+  noteRisks();
   render();
   schedule();
   if (pending) {
@@ -194,6 +206,29 @@ async function refresh(forceFull: boolean) {
     pending = null;
     void refresh(next.full);
   }
+}
+
+/** A risk that was not there at the last refresh flashes the taskbar (setting flashTaskbar). */
+function noteRisks() {
+  if (!doc) return;
+  const risks = currentGlance().risks;
+  if (newRisks(knownRisks, risks).length && settings.flashTaskbar) flashPending = true;
+  knownRisks = new Set(risks);
+}
+
+function currentGlance() {
+  return glance({ doc, warnings: currentWarnings(), settings, error: lastError !== null, paused });
+}
+
+/** Tray tooltip and taskbar badge, sent when they change (renderStatus runs every second). */
+function sendGlance() {
+  const g = currentGlance();
+  const key = `${g.level}|${g.status}`;
+  if (key === glanceSent && !flashPending) return;
+  glanceSent = key;
+  const attention = flashPending;
+  flashPending = false;
+  void call("set_glance", { status: g.status, level: g.level, attention }).catch(() => {});
 }
 
 function onSignal() {
@@ -465,6 +500,7 @@ function renderStatus() {
   core.className = lastError && !doc ? "hot" : "";
   core.title = t("status.coreTitle");
   fitStatusbar();
+  sendGlance();
 }
 
 /** Durations and the countdown move every second without redrawing the rows. */
@@ -1058,7 +1094,14 @@ async function boot() {
   await call("window_ready").catch(() => {});
 
   await on("slot-signal", onSignal);
-  await on("widget-shown", () => void refresh(false));
+  const reloadSettings = () => void call<WidgetSettings>("get_settings").then(receiveSettings).catch(() => {});
+  // Back from the tray: settings may have changed meanwhile; refresh unless one just ended
+  await on("widget-shown", () => {
+    reloadSettings();
+    if (Date.now() - refreshedAt > 5000) void refresh(false);
+  });
+  // widget.json changed (here or by someone else): what the file holds now applies
+  await on("settings-file-changed", reloadSettings);
   // The tray menu's Settings
   await on("open-settings", () => openSettings());
 

@@ -152,6 +152,7 @@
   "tray.show": "창 보이기",
   "tray.settings": "설정",
   "tray.quit": "종료",
+  "tray.stalled": "멈춤 {n}",
 
   "dur.s": "{n}초",
   "dur.m": "{n}분",

@@ -4,7 +4,11 @@
 //! In between, this thread looks every few seconds at two things that cost a few ms:
 //! the set of running Unity.exe process ids (ToolHelp snapshot, no process is started) and the
 //! files in the slot home (registry, leases, events). When either changes, the page refreshes
-//! at once. While the widget is hidden the thread does nothing.
+//! at once. It also watches widget.json, so a setting changed by a person or an agent applies.
+//!
+//! Minimized, the window still counts as visible (IsWindowVisible) and everything goes on: the
+//! taskbar badge and the tray tooltip keep showing the state. Only a window hidden to the tray
+//! makes the thread (and the page's refreshes) stop; showing it again refreshes at once.
 
 use std::collections::hash_map::DefaultHasher;
 use std::hash::{Hash, Hasher};
@@ -87,9 +91,16 @@ fn signature() -> u64 {
     h.finish()
 }
 
+fn settings_signature() -> u64 {
+    let mut h = DefaultHasher::new();
+    hash_file(&mut h, &paths::slot_home().join("widget.json"));
+    h.finish()
+}
+
 pub fn start(app: AppHandle) {
     std::thread::spawn(move || {
         let mut last: Option<u64> = None;
+        let mut last_settings: Option<u64> = None;
         let mut was_visible = true;
         loop {
             std::thread::sleep(Duration::from_secs(INTERVAL_SECS.load(Ordering::Relaxed)));
@@ -104,9 +115,15 @@ pub fn start(app: AppHandle) {
             if !was_visible {
                 was_visible = true;
                 last = None;
+                last_settings = None;
                 let _ = app.emit_to("main", "widget-shown", ());
                 continue;
             }
+            let settings_sig = settings_signature();
+            if last_settings.is_some_and(|prev| prev != settings_sig) {
+                let _ = app.emit_to("main", "settings-file-changed", ());
+            }
+            last_settings = Some(settings_sig);
             let sig = signature();
             if last.is_some_and(|prev| prev != sig) {
                 let _ = app.emit_to("main", "slot-signal", ());

@@ -2,6 +2,7 @@ mod appwindow;
 mod core;
 mod install;
 mod open;
+mod overlay;
 mod paths;
 mod settings;
 mod signals;
@@ -113,6 +114,19 @@ fn set_tray_labels(app: tauri::AppHandle, labels: tray::TrayLabels) -> Result<()
     tray::set_labels(&app, &labels)
 }
 
+/// At a glance while the window is out of sight: the tray tooltip (`status` under the app name),
+/// the taskbar badge for `level` (critical | warn | ok | none) and, for a new risk, a taskbar flash.
+#[tauri::command]
+fn set_glance(app: tauri::AppHandle, status: String, level: String, attention: bool) {
+    tray::set_tooltip(&app, &overlay::tooltip_text(&app.package_info().name, &status));
+    if let Some(window) = app.get_webview_window(MAIN_LABEL) {
+        overlay::set_badge(&window, &level);
+        if attention {
+            overlay::flash(&window);
+        }
+    }
+}
+
 #[tauri::command]
 fn quit_app(app: tauri::AppHandle) {
     app.exit(0);
@@ -161,6 +175,7 @@ pub fn run() {
             open_in_unity,
             focus_editor,
             set_tray_labels,
+            set_glance,
             quit_app,
             enable_autostart,
             disable_autostart,
