@@ -59,7 +59,8 @@ const STARTING_CAP_MS = 5 * 60_000;
 const FIRST_LOOK_FULL_MS = 60_000;
 
 type SlotFilter = "all" | "open" | "attention";
-const isFilter = (v: unknown): v is SlotFilter => v === "all" || v === "open" || v === "attention";
+const FILTERS: readonly SlotFilter[] = ["all", "open", "attention"];
+const isFilter = (v: unknown): v is SlotFilter => FILTERS.includes(v as SlotFilter);
 const isStringOrNull = (v: unknown): v is string | null => v === null || typeof v === "string";
 
 /** The settings in effect (src/settings.ts keeps them; this is its latest copy). */
@@ -300,7 +301,10 @@ function renderList() {
   const inner = $("list-inner");
   $("view-slots").textContent = t("view.slots", { n: slots().length });
   document.querySelectorAll<HTMLElement>("#filter-chips [data-filter]").forEach((b) => {
-    b.setAttribute("aria-checked", String(b.dataset.filter === filter));
+    const on = b.dataset.filter === filter;
+    b.setAttribute("aria-checked", String(on));
+    // One tab stop for the group (radio pattern); ←/→ move between the chips
+    b.tabIndex = on ? 0 : -1;
   });
   if (!doc) {
     // Without a document the details column carries the message; in a narrow window, the list
@@ -928,6 +932,15 @@ function bindEvents() {
   $("filter-chips").addEventListener("click", (e) => {
     const value = (e.target as HTMLElement).closest<HTMLElement>("[data-filter]")?.dataset.filter;
     if (isFilter(value)) setFilter(value);
+  });
+  // ↑↓ Home End stay the list's keys (keys.ts); ←/→ pick the next chip at once, as radio buttons do
+  $("filter-chips").addEventListener("keydown", (e) => {
+    if (e.key !== "ArrowLeft" && e.key !== "ArrowRight") return;
+    e.preventDefault();
+    const step = e.key === "ArrowRight" ? 1 : FILTERS.length - 1;
+    const next = FILTERS[(FILTERS.indexOf(filter) + step) % FILTERS.length];
+    setFilter(next);
+    document.querySelector<HTMLElement>(`#filter-chips [data-filter="${next}"]`)?.focus();
   });
   $("view-tabs").addEventListener("click", (e) => {
     const value = (e.target as HTMLElement).closest<HTMLElement>("[data-view]")?.dataset.view;

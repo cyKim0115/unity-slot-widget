@@ -7,6 +7,8 @@
 
 const bar = document.querySelector<HTMLElement>("#statusbar")!;
 const pathEl = document.querySelector<HTMLElement>("#status-path")!;
+/** role="status": screen readers read the notices out (the path slot itself changes too often). */
+const liveEl = document.querySelector<HTMLElement>("#status-live");
 
 let baseText = "";
 let baseTitle = "";
@@ -17,6 +19,8 @@ function paintBase(): void {
   pathEl.textContent = baseText;
   pathEl.title = baseTitle;
   pathEl.classList.remove("flash");
+  // Nothing to copy: no empty, nameless button in the Tab order
+  pathEl.tabIndex = baseText ? 0 : -1;
 }
 
 /** The resting content of the left slot. A notice on screen keeps its time. */
@@ -32,6 +36,11 @@ export function flashStatus(message: string, ms = 2200): void {
   pathEl.textContent = message;
   pathEl.title = message;
   pathEl.classList.add("flash");
+  if (liveEl) {
+    // Emptied first, so the same notice twice is read out twice
+    liveEl.textContent = "";
+    window.setTimeout(() => (liveEl.textContent = message), 30);
+  }
   window.clearTimeout(flashTimer);
   flashTimer = window.setTimeout(() => {
     flashing = false;

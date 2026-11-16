@@ -39,7 +39,7 @@ async function preview(cmd: string, args?: Record<string, unknown>): Promise<unk
     case "get_core_location":
       return { script: null, source: "none", slotHome: "(preview)" };
     case "get_app_info":
-      return { version: "0.0.0-preview", settingsFile: "(preview)\widget.json", slotHome: "(preview)", dev: true };
+      return { version: "0.0.0-preview", settingsFile: "(preview)\\widget.json", slotHome: "(preview)", dev: true };
     case "open_in_unity":
       return { outcome: "started", pid: null, warnings: [] };
     case "is_autostart_enabled":
