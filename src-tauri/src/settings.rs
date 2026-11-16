@@ -3,9 +3,9 @@
 //! Kept next to the slot registry (not in AppData) so the file is the same for the user, their
 //! terminal and agents. Because others write it too, the app never writes its whole copy back:
 //! [`update`] reads the file again, merges only the keys that changed, clamps them and replaces the
-//! file through a temporary one. Keys this build does not know stay as they are (the old
-//! `alwaysOnTop`, anything a person or a newer build added); the retired `glass` and `glassBlur` go
-//! away on the next save. A value that cannot be read falls back to its own default only.
+//! file through a temporary one. Keys this build does not know stay as they are and are not read
+//! (the old `alwaysOnTop`, the old background-blur keys, anything a person or a newer build added).
+//! A value that cannot be read falls back to its own default only.
 //! The window position and size stay with the window-state plugin.
 
 use std::path::{Path, PathBuf};
@@ -79,9 +79,6 @@ pub const KEYS: [&str; 20] = [
     "unitySlotScript",
     "sampleFile",
 ];
-
-/// Keys of earlier builds that mean nothing now; dropped when the file is written.
-const RETIRED: [&str; 2] = ["glass", "glassBlur"];
 
 /// A development sample given in the environment. Never stored in the settings.
 pub const SAMPLE_ENV: &str = "UNITY_SLOT_WIDGET_SAMPLE";
@@ -239,14 +236,10 @@ static WRITE: Mutex<()> = Mutex::new(());
 
 /// Merges `patch` into the file at `path` and returns the settings now in effect.
 /// Unknown keys and values of the wrong type in `patch` are skipped; the others are written
-/// clamped. Nothing else in the file changes, apart from dropping the retired keys.
+/// clamped. Nothing else in the file changes.
 fn update_at(path: &Path, patch: &Map<String, Value>) -> Result<WidgetSettings, String> {
     let _guard = WRITE.lock().unwrap_or_else(|e| e.into_inner());
     let mut obj = read_object(path)?.unwrap_or_default();
-    let mut retired = false;
-    for key in RETIRED {
-        retired |= obj.remove(key).is_some();
-    }
     let mut accepted = Vec::new();
     for (key, value) in patch {
         if KEYS.contains(&key.as_str()) && fits(key, value) {
@@ -263,7 +256,7 @@ fn update_at(path: &Path, patch: &Map<String, Value>) -> Result<WidgetSettings, 
             }
         }
     }
-    if retired || !accepted.is_empty() {
+    if !accepted.is_empty() {
         write_replace(path, &to_text(&obj))?;
     }
     Ok(settings)
@@ -316,11 +309,11 @@ mod tests {
     }
 
     #[test]
-    fn keeps_keys_changed_elsewhere_and_drops_retired_ones() {
+    fn keeps_keys_changed_elsewhere_and_unknown_ones() {
         let path = temp_file("external");
         std::fs::write(
             &path,
-            r#"{"alwaysOnTop": true, "idleSecs": 45, "glass": false, "glassBlur": 12.0, "note": {"by": "agent"}}"#,
+            r#"{"alwaysOnTop": true, "idleSecs": 45, "oldBlur": 12.0, "note": {"by": "agent"}}"#,
         )
         .unwrap();
         let saved = update_at(&path, &patch(serde_json::json!({ "theme": "dark" }))).unwrap();
@@ -331,7 +324,7 @@ mod tests {
         assert_eq!(file["idleSecs"], serde_json::json!(45));
         assert_eq!(file["note"], serde_json::json!({ "by": "agent" }));
         assert_eq!(file["theme"], Value::String("dark".into()));
-        assert!(!file.contains_key("glass") && !file.contains_key("glassBlur"));
+        assert_eq!(file["oldBlur"], serde_json::json!(12.0));
         // Only the changed key was added; the defaults of the others are not written
         assert!(!file.contains_key("signalSecs"));
 
@@ -405,8 +398,8 @@ mod tests {
         assert_eq!(read(&path)["sampleFile"], Value::String(String::new()));
         // The setting wins over the environment
         let mut with_setting = loaded.clone();
-        with_setting.sample_file = r" D:\mine.json ".into();
-        assert_eq!(sample_source(&with_setting).as_deref(), Some(r"D:\mine.json"));
+        with_setting.sample_file = r" C:\samples\mine.json ".into();
+        assert_eq!(sample_source(&with_setting).as_deref(), Some(r"C:\samples\mine.json"));
         std::env::remove_var(SAMPLE_ENV);
         assert_eq!(sample_source(&loaded), None);
     }
