@@ -1,6 +1,6 @@
 {
   "schema": "unity-slot.dashboard/1",
-  "version": "0.6.1",
+  "version": "0.7.0",
   "time": "2026-11-06T18:20:00+09:00",
   "host": "DEV-PC",
   "registry": { "path": "C:\\Projects\\.unity-slot\\slots.json", "updatedAt": "2026-11-06T16:55:55+09:00", "maxEditors": 6 },
@@ -42,11 +42,15 @@
         "behind": 0,
         "lastFetchAt": "2026-11-06T18:12:00+09:00",
         "commonDir": "C:\\Projects\\MyGame\\.git",
-        "localOnly": { "commits": 103, "oldestAt": "2026-09-14T11:02:00+09:00" },
-        "branches": { "total": 16, "noUpstream": 10, "upstreamGone": 0 },
-        "stash": 0,
+        "localOnly": { "commits": 16, "oldestAt": "2026-09-14T11:02:00+09:00" },
+        "branches": { "total": 7, "noUpstream": 1, "upstreamGone": 2 },
+        "stash": 1,
         "worktrees": ["C:\\Projects\\MyGame-release"],
-        "error": null
+        "error": null,
+        "head": "d801d944aa58c967af303756bf02d9085c35f2aa",
+        "detached": false,
+        "changesDetail": { "staged": 2, "unstaged": 9, "untracked": 1, "conflicted": 0 },
+        "gitDir": "C:\\Projects\\MyGame\\.git"
       },
       "lastOpenedAt": "2026-11-05T09:40:26+09:00",
       "lastClosedAt": "2026-11-04T20:12:00+09:00",
@@ -75,7 +79,7 @@
         "standby": "1",
         "lock": "held",
         "unsavedScene": false,
-        "memory": { "editorPrivGB": 5.6, "workersPrivGB": 2.0, "childrenPrivGB": 2.91, "totalPrivGB": 10.51, "totalWsGB": 7.69, "workers": 1, "children": 29 }
+        "memory": { "editorPrivGB": 5.6, "workersPrivGB": 2, "childrenPrivGB": 2.91, "totalPrivGB": 10.51, "totalWsGB": 7.69, "workers": 1, "children": 29 }
       },
       "lease": {
         "owner": "claude:93ccbb47",
@@ -97,15 +101,19 @@
         "behind": 0,
         "lastFetchAt": "2026-11-06T18:12:00+09:00",
         "commonDir": "C:\\Projects\\MyGame-1\\.git",
-        "localOnly": { "commits": 0, "oldestAt": null },
-        "branches": { "total": 2, "noUpstream": 0, "upstreamGone": 0 },
+        "localOnly": { "commits": 9, "oldestAt": "2026-09-14T11:02:00+09:00" },
+        "branches": { "total": 3, "noUpstream": 1, "upstreamGone": 0 },
         "stash": 0,
         "worktrees": [],
-        "error": null
+        "error": null,
+        "head": "d801d944aa58c967af303756bf02d9085c35f2aa",
+        "detached": false,
+        "changesDetail": { "staged": 0, "unstaged": 0, "untracked": 0, "conflicted": 0 },
+        "gitDir": "C:\\Projects\\MyGame-1\\.git"
       },
       "lastOpenedAt": "2026-11-05T09:41:52+09:00",
       "lastClosedAt": "2026-11-04T19:58:00+09:00",
-      "flags": []
+      "flags": ["local-only-old"]
     },
     {
       "name": "MyGame-WebGL",
@@ -149,13 +157,17 @@
         "changes": 0,
         "ahead": 0,
         "behind": 0,
-        "lastFetchAt": "2026-11-06T18:12:00+09:00",
+        "lastFetchAt": "2026-11-04T09:30:00+09:00",
         "commonDir": "C:\\Projects\\MyGame-WebGL\\.git",
         "localOnly": { "commits": 0, "oldestAt": null },
-        "branches": { "total": 3, "noUpstream": 1, "upstreamGone": 0 },
+        "branches": { "total": 3, "noUpstream": 0, "upstreamGone": 0 },
         "stash": 0,
         "worktrees": [],
-        "error": null
+        "error": null,
+        "head": "c395c8e8dfe8dcb2629333c4bcb0d573c8a7d117",
+        "detached": false,
+        "changesDetail": { "staged": 0, "unstaged": 0, "untracked": 0, "conflicted": 0 },
+        "gitDir": "C:\\Projects\\MyGame-WebGL\\.git"
       },
       "lastOpenedAt": "2026-11-06T18:19:22+09:00",
       "lastClosedAt": "2026-11-06T16:44:12+09:00",
@@ -187,10 +199,14 @@
         "lastFetchAt": "2026-11-06T17:30:00+09:00",
         "commonDir": "C:\\Projects\\MyGame-Agent\\.git",
         "localOnly": { "commits": 4, "oldestAt": "2026-11-02T14:00:00+09:00" },
-        "branches": { "total": 3, "noUpstream": 1, "upstreamGone": 0 },
+        "branches": { "total": 2, "noUpstream": 1, "upstreamGone": 0 },
         "stash": 0,
         "worktrees": [],
-        "error": null
+        "error": null,
+        "head": "89cdc0ef3f82e9623bee51013cd2d1f00ef37997",
+        "detached": false,
+        "changesDetail": { "staged": 0, "unstaged": 1, "untracked": 1, "conflicted": 0 },
+        "gitDir": "C:\\Projects\\MyGame-Agent\\.git"
       },
       "lastOpenedAt": "2026-11-06T15:02:00+09:00",
       "lastClosedAt": "2026-11-06T17:40:00+09:00",
@@ -221,15 +237,19 @@
         "behind": 0,
         "lastFetchAt": "2026-11-06T18:12:00+09:00",
         "commonDir": "C:\\Projects\\MyGame\\.git",
-        "localOnly": { "commits": 103, "oldestAt": "2026-09-14T11:02:00+09:00" },
-        "branches": { "total": 16, "noUpstream": 10, "upstreamGone": 0 },
-        "stash": 0,
+        "localOnly": { "commits": 16, "oldestAt": "2026-09-14T11:02:00+09:00" },
+        "branches": { "total": 7, "noUpstream": 1, "upstreamGone": 2 },
+        "stash": 1,
         "worktrees": ["C:\\Projects\\MyGame"],
-        "error": null
+        "error": null,
+        "head": "c395c8e8dfe8dcb2629333c4bcb0d573c8a7d117",
+        "detached": false,
+        "changesDetail": { "staged": 0, "unstaged": 0, "untracked": 0, "conflicted": 0 },
+        "gitDir": "C:\\Projects\\MyGame\\.git\\worktrees\\MyGame-release"
       },
       "lastOpenedAt": "2026-11-05T21:30:00+09:00",
       "lastClosedAt": "2026-11-05T22:10:00+09:00",
-      "flags": []
+      "flags": ["local-only-old"]
     },
     {
       "name": "Popup",
@@ -268,10 +288,14 @@
         "lastFetchAt": "2026-11-06T18:12:00+09:00",
         "commonDir": "C:\\Projects\\Popup\\.git",
         "localOnly": { "commits": 5, "oldestAt": "2026-10-20T10:00:00+09:00" },
-        "branches": { "total": 3, "noUpstream": 1, "upstreamGone": 0 },
+        "branches": { "total": 2, "noUpstream": 1, "upstreamGone": 0 },
         "stash": 1,
         "worktrees": [],
-        "error": null
+        "error": null,
+        "head": "efa4fb99ab33f09c8131548b6a36251f83ed12b9",
+        "detached": false,
+        "changesDetail": { "staged": 0, "unstaged": 3, "untracked": 0, "conflicted": 0 },
+        "gitDir": "C:\\Projects\\Popup\\.git"
       },
       "lastOpenedAt": "2026-11-06T14:17:38+09:00",
       "lastClosedAt": "2026-11-05T19:30:00+09:00",
@@ -300,7 +324,7 @@
         "standby": "1",
         "lock": "held",
         "unsavedScene": false,
-        "memory": { "editorPrivGB": 6.1, "workersPrivGB": 2.3, "childrenPrivGB": 4.1, "totalPrivGB": 12.5, "totalWsGB": 8.0, "workers": 1, "children": 31 }
+        "memory": { "editorPrivGB": 6.1, "workersPrivGB": 2.3, "childrenPrivGB": 4.1, "totalPrivGB": 12.5, "totalWsGB": 8, "workers": 1, "children": 31 }
       },
       "lease": null,
       "git": {
@@ -317,7 +341,11 @@
         "branches": { "total": 2, "noUpstream": 1, "upstreamGone": 0 },
         "stash": 0,
         "worktrees": [],
-        "error": null
+        "error": null,
+        "head": "b9483c77289fdaca2e3a0b0b7473d83af60618ed",
+        "detached": false,
+        "changesDetail": { "staged": 1, "unstaged": 2, "untracked": 0, "conflicted": 0 },
+        "gitDir": "C:\\Projects\\Popup-Windows\\.git"
       },
       "lastOpenedAt": "2026-11-06T10:05:00+09:00",
       "lastClosedAt": "2026-11-05T18:00:00+09:00",
@@ -352,7 +380,11 @@
         "branches": { "total": 1, "noUpstream": 0, "upstreamGone": 0 },
         "stash": 0,
         "worktrees": [],
-        "error": null
+        "error": null,
+        "head": "b41e289563608c966a4a73f42e9651ff3516c14b",
+        "detached": false,
+        "changesDetail": { "staged": 0, "unstaged": 0, "untracked": 0, "conflicted": 0 },
+        "gitDir": "C:\\Projects\\Popup-Agent\\.git"
       },
       "lastOpenedAt": "2026-10-28T11:00:00+09:00",
       "lastClosedAt": "2026-10-28T13:20:00+09:00",
@@ -371,11 +403,601 @@
   "orphanWorkers": [],
   "recentEvents": [
     { "time": "2026-11-06T16:10:00+09:00", "event": "acquire", "slot": "MyGame-1", "owner": "claude:93ccbb47", "pid": 41236, "via": "mcp", "detail": null },
-    { "time": "2026-11-06T16:44:12+09:00", "event": "release", "slot": "MyGame-WebGL", "owner": "claude:739cec57", "pid": 48820, "via": "mcp", "detail": { "closeSeconds": 4.4, "commitDeltaGB": -8.9, "changedFiles": 0 } },
-    { "time": "2026-11-06T17:40:00+09:00", "event": "close", "slot": "MyGame-Agent", "owner": "codex:skin", "pid": 39911, "via": "cli", "detail": { "closeSeconds": 4.1, "commitDeltaGB": -7.2, "changedFiles": 2 } },
+    {
+      "time": "2026-11-06T16:44:12+09:00",
+      "event": "release",
+      "slot": "MyGame-WebGL",
+      "owner": "claude:739cec57",
+      "pid": 48820,
+      "via": "mcp",
+      "detail": { "closeSeconds": 4.4, "commitDeltaGB": -8.9, "changedFiles": 0 }
+    },
+    {
+      "time": "2026-11-06T17:40:00+09:00",
+      "event": "close",
+      "slot": "MyGame-Agent",
+      "owner": "codex:skin",
+      "pid": 39911,
+      "via": "cli",
+      "detail": { "closeSeconds": 4.1, "commitDeltaGB": -7.2, "changedFiles": 2 }
+    },
     { "time": "2026-11-06T18:19:20+09:00", "event": "acquire", "slot": "MyGame-WebGL", "owner": "codex:web-fix", "pid": null, "via": "mcp", "detail": null },
     { "time": "2026-11-06T18:19:22+09:00", "event": "open", "slot": "MyGame-WebGL", "owner": "codex:web-fix", "pid": 50112, "via": "mcp", "detail": null }
   ],
   "systemFlags": [],
-  "timing": { "totalMs": 1450, "processMs": 640, "gitMs": 2100 }
+  "timing": { "totalMs": 1450, "processMs": 640, "gitMs": 2100 },
+  "repos": [
+    {
+      "commonDir": "C:\\Projects\\MyGame\\.git",
+      "project": "my-org/my-game",
+      "repo": "MyGame",
+      "level": "full",
+      "layout": "worktrees",
+      "hub": null,
+      "lastFetchAt": "2026-11-06T18:12:00+09:00",
+      "defaultBranch": "origin/master",
+      "folders": [
+        {
+          "path": "C:\\Projects\\MyGame",
+          "slot": "MyGame",
+          "main": true,
+          "branch": "master",
+          "head": "d801d944aa58c967af303756bf02d9085c35f2aa",
+          "detached": false,
+          "locked": null,
+          "prunable": null,
+          "localOnly": null
+        },
+        {
+          "path": "C:\\Projects\\MyGame-release",
+          "slot": "MyGame-release",
+          "main": false,
+          "branch": "build/webgl",
+          "head": "c395c8e8dfe8dcb2629333c4bcb0d573c8a7d117",
+          "detached": false,
+          "locked": null,
+          "prunable": null,
+          "localOnly": null
+        }
+      ],
+      "branches": [
+        {
+          "name": "master",
+          "tip": "d801d944aa58c967af303756bf02d9085c35f2aa",
+          "tipAt": "2026-11-05T15:10:00+09:00",
+          "subject": "Merge pull request #212 from my-org/feature/shop",
+          "upstream": "origin/master",
+          "upstreamGone": false,
+          "ahead": 0,
+          "behind": 0,
+          "baseAhead": 0,
+          "baseBehind": 0,
+          "merged": true,
+          "localOnly": { "commits": 0, "oldestAt": null },
+          "checkedOutBy": [{ "path": "C:\\Projects\\MyGame", "slot": "MyGame" }]
+        },
+        {
+          "name": "build/webgl",
+          "tip": "c395c8e8dfe8dcb2629333c4bcb0d573c8a7d117",
+          "tipAt": "2026-11-05T15:10:00+09:00",
+          "subject": "Work on webgl",
+          "upstream": "origin/build/webgl",
+          "upstreamGone": false,
+          "ahead": 0,
+          "behind": 0,
+          "baseAhead": 4,
+          "baseBehind": 0,
+          "merged": false,
+          "localOnly": { "commits": 0, "oldestAt": null },
+          "checkedOutBy": [{ "path": "C:\\Projects\\MyGame-release", "slot": "MyGame-release" }]
+        },
+        {
+          "name": "backup/recording-build-master-684e8cdb",
+          "tip": "fbdd4203f90a2a67523ed3f91cd321843a9af667",
+          "tipAt": "2026-09-14T11:02:00+09:00",
+          "subject": "Work on recording-build-master-684e8cdb",
+          "upstream": null,
+          "upstreamGone": false,
+          "ahead": null,
+          "behind": null,
+          "baseAhead": 9,
+          "baseBehind": 0,
+          "merged": false,
+          "localOnly": { "commits": 9, "oldestAt": "2026-09-14T11:02:00+09:00" },
+          "checkedOutBy": []
+        },
+        {
+          "name": "feature/old-chat-prototype",
+          "tip": "b61d4de6d50c5ad4796d63f8e61f5963b5bab0ab",
+          "tipAt": "2026-10-20T10:00:00+09:00",
+          "subject": "Work on old-chat-prototype",
+          "upstream": "origin/feature/old-chat-prototype",
+          "upstreamGone": true,
+          "ahead": null,
+          "behind": null,
+          "baseAhead": 7,
+          "baseBehind": 0,
+          "merged": false,
+          "localOnly": { "commits": 7, "oldestAt": "2026-10-20T10:00:00+09:00" },
+          "checkedOutBy": []
+        },
+        {
+          "name": "feature/art-hanbok-dummy",
+          "tip": "73604e7adeee792f0375de5dc351253143451eb6",
+          "tipAt": "2026-11-05T15:10:00+09:00",
+          "subject": "Work on art-hanbok-dummy",
+          "upstream": "origin/master",
+          "upstreamGone": false,
+          "ahead": 0,
+          "behind": 0,
+          "baseAhead": 0,
+          "baseBehind": 0,
+          "merged": true,
+          "localOnly": { "commits": 0, "oldestAt": null },
+          "checkedOutBy": []
+        },
+        {
+          "name": "feature/recording-build",
+          "tip": "aab4c2f16f461d9c760d1260ff4fa3a8c5a32412",
+          "tipAt": "2026-11-05T15:10:00+09:00",
+          "subject": "Work on recording-build",
+          "upstream": "origin/feature/recording-build",
+          "upstreamGone": false,
+          "ahead": 0,
+          "behind": 3,
+          "baseAhead": 5,
+          "baseBehind": 0,
+          "merged": false,
+          "localOnly": { "commits": 0, "oldestAt": null },
+          "checkedOutBy": []
+        },
+        {
+          "name": "feature/done-cleanup",
+          "tip": "9105191d0720b27bfefcc7dede33ee8128b2b62f",
+          "tipAt": "2026-10-01T09:00:00+09:00",
+          "subject": "Work on done-cleanup",
+          "upstream": "origin/feature/done-cleanup",
+          "upstreamGone": true,
+          "ahead": null,
+          "behind": null,
+          "baseAhead": 0,
+          "baseBehind": 0,
+          "merged": true,
+          "localOnly": { "commits": 0, "oldestAt": null },
+          "checkedOutBy": []
+        }
+      ],
+      "stashes": [
+        {
+          "index": 0,
+          "sha": "15dd8122d772a9e2e89769ab48f92b0599df7c0f",
+          "at": "2026-11-05T19:30:00+09:00",
+          "branch": "build/webgl",
+          "message": "On build/webgl: tweak loading screen"
+        }
+      ],
+      "localOnly": { "commits": 16, "oldestAt": "2026-09-14T11:02:00+09:00" },
+      "flags": ["local-only-old"],
+      "error": null
+    },
+    {
+      "commonDir": "C:\\Projects\\MyGame-1\\.git",
+      "project": "my-org/my-game",
+      "repo": "MyGame",
+      "level": "full",
+      "layout": "clone",
+      "hub": null,
+      "lastFetchAt": "2026-11-06T18:12:00+09:00",
+      "defaultBranch": "origin/master",
+      "folders": [
+        {
+          "path": "C:\\Projects\\MyGame-1",
+          "slot": "MyGame-1",
+          "main": true,
+          "branch": "master",
+          "head": "d801d944aa58c967af303756bf02d9085c35f2aa",
+          "detached": false,
+          "locked": null,
+          "prunable": null,
+          "localOnly": null
+        }
+      ],
+      "branches": [
+        {
+          "name": "master",
+          "tip": "d801d944aa58c967af303756bf02d9085c35f2aa",
+          "tipAt": "2026-11-05T15:10:00+09:00",
+          "subject": "Work on master",
+          "upstream": "origin/master",
+          "upstreamGone": false,
+          "ahead": 0,
+          "behind": 0,
+          "baseAhead": 0,
+          "baseBehind": 0,
+          "merged": true,
+          "localOnly": { "commits": 0, "oldestAt": null },
+          "checkedOutBy": [{ "path": "C:\\Projects\\MyGame-1", "slot": "MyGame-1" }]
+        },
+        {
+          "name": "feature/recording-build",
+          "tip": "4ab38b9050bb8ce23f024a1846603d0ffd9acb67",
+          "tipAt": "2026-11-05T15:10:00+09:00",
+          "subject": "Work on recording-build",
+          "upstream": "origin/feature/recording-build",
+          "upstreamGone": false,
+          "ahead": 0,
+          "behind": 0,
+          "baseAhead": 8,
+          "baseBehind": 0,
+          "merged": false,
+          "localOnly": { "commits": 0, "oldestAt": null },
+          "checkedOutBy": []
+        },
+        {
+          "name": "backup/recording-build-master-684e8cdb",
+          "tip": "fbdd4203f90a2a67523ed3f91cd321843a9af667",
+          "tipAt": "2026-09-14T11:02:00+09:00",
+          "subject": "Work on recording-build-master-684e8cdb",
+          "upstream": null,
+          "upstreamGone": false,
+          "ahead": null,
+          "behind": null,
+          "baseAhead": 9,
+          "baseBehind": 0,
+          "merged": false,
+          "localOnly": { "commits": 9, "oldestAt": "2026-09-14T11:02:00+09:00" },
+          "checkedOutBy": []
+        }
+      ],
+      "stashes": [],
+      "localOnly": { "commits": 9, "oldestAt": "2026-09-14T11:02:00+09:00" },
+      "flags": ["local-only-old"],
+      "error": null
+    },
+    {
+      "commonDir": "C:\\Projects\\MyGame-WebGL\\.git",
+      "project": "my-org/my-game",
+      "repo": "MyGame",
+      "level": "full",
+      "layout": "clone",
+      "hub": null,
+      "lastFetchAt": "2026-11-04T09:30:00+09:00",
+      "defaultBranch": "origin/master",
+      "folders": [
+        {
+          "path": "C:\\Projects\\MyGame-WebGL",
+          "slot": "MyGame-WebGL",
+          "main": true,
+          "branch": "build/webgl",
+          "head": "c395c8e8dfe8dcb2629333c4bcb0d573c8a7d117",
+          "detached": false,
+          "locked": null,
+          "prunable": null,
+          "localOnly": null
+        }
+      ],
+      "branches": [
+        {
+          "name": "master",
+          "tip": "95a39b74b25a88514ae6af299e25e88ba4d0b62a",
+          "tipAt": "2026-11-05T15:10:00+09:00",
+          "subject": "Work on master",
+          "upstream": "origin/master",
+          "upstreamGone": false,
+          "ahead": 0,
+          "behind": 2,
+          "baseAhead": 0,
+          "baseBehind": 0,
+          "merged": true,
+          "localOnly": { "commits": 0, "oldestAt": null },
+          "checkedOutBy": []
+        },
+        {
+          "name": "build/webgl",
+          "tip": "c395c8e8dfe8dcb2629333c4bcb0d573c8a7d117",
+          "tipAt": "2026-11-05T15:10:00+09:00",
+          "subject": "Work on webgl",
+          "upstream": "origin/build/webgl",
+          "upstreamGone": false,
+          "ahead": 0,
+          "behind": 0,
+          "baseAhead": 4,
+          "baseBehind": 0,
+          "merged": false,
+          "localOnly": { "commits": 0, "oldestAt": null },
+          "checkedOutBy": [{ "path": "C:\\Projects\\MyGame-WebGL", "slot": "MyGame-WebGL" }]
+        },
+        {
+          "name": "feature/recording-build",
+          "tip": "210d94991b3fbb10c1025b63e7efee17a49a88c5",
+          "tipAt": "2026-11-05T15:10:00+09:00",
+          "subject": "Work on recording-build",
+          "upstream": "origin/feature/recording-build",
+          "upstreamGone": false,
+          "ahead": 0,
+          "behind": 1,
+          "baseAhead": 7,
+          "baseBehind": 0,
+          "merged": false,
+          "localOnly": { "commits": 0, "oldestAt": null },
+          "checkedOutBy": []
+        }
+      ],
+      "stashes": [],
+      "localOnly": { "commits": 0, "oldestAt": null },
+      "flags": [],
+      "error": null
+    },
+    {
+      "commonDir": "C:\\Projects\\MyGame-Agent\\.git",
+      "project": "my-org/my-game",
+      "repo": "MyGame",
+      "level": "full",
+      "layout": "clone",
+      "hub": null,
+      "lastFetchAt": "2026-11-06T17:30:00+09:00",
+      "defaultBranch": "origin/master",
+      "folders": [
+        {
+          "path": "C:\\Projects\\MyGame-Agent",
+          "slot": "MyGame-Agent",
+          "main": true,
+          "branch": "feature/skin-paint-fx",
+          "head": "89cdc0ef3f82e9623bee51013cd2d1f00ef37997",
+          "detached": false,
+          "locked": null,
+          "prunable": null,
+          "localOnly": null
+        }
+      ],
+      "branches": [
+        {
+          "name": "master",
+          "tip": "a10989f21f246f07fb3188c8f9cb95d29c1b130a",
+          "tipAt": "2026-11-05T15:10:00+09:00",
+          "subject": "Work on master",
+          "upstream": "origin/master",
+          "upstreamGone": false,
+          "ahead": 2,
+          "behind": 0,
+          "baseAhead": 2,
+          "baseBehind": 0,
+          "merged": false,
+          "localOnly": { "commits": 0, "oldestAt": null },
+          "checkedOutBy": []
+        },
+        {
+          "name": "feature/skin-paint-fx",
+          "tip": "89cdc0ef3f82e9623bee51013cd2d1f00ef37997",
+          "tipAt": "2026-11-06T16:40:00+09:00",
+          "subject": "Work on skin-paint-fx",
+          "upstream": null,
+          "upstreamGone": false,
+          "ahead": null,
+          "behind": null,
+          "baseAhead": 4,
+          "baseBehind": 0,
+          "merged": false,
+          "localOnly": { "commits": 4, "oldestAt": "2026-11-02T14:00:00+09:00" },
+          "checkedOutBy": [{ "path": "C:\\Projects\\MyGame-Agent", "slot": "MyGame-Agent" }]
+        }
+      ],
+      "stashes": [],
+      "localOnly": { "commits": 4, "oldestAt": "2026-11-02T14:00:00+09:00" },
+      "flags": [],
+      "error": null
+    },
+    {
+      "commonDir": "C:\\Projects\\Popup\\.git",
+      "project": "my-org/popup",
+      "repo": "Popup",
+      "level": "full",
+      "layout": "clone",
+      "hub": null,
+      "lastFetchAt": "2026-11-06T18:12:00+09:00",
+      "defaultBranch": "origin/master",
+      "folders": [
+        {
+          "path": "C:\\Projects\\Popup",
+          "slot": "Popup",
+          "main": true,
+          "branch": "master",
+          "head": "efa4fb99ab33f09c8131548b6a36251f83ed12b9",
+          "detached": false,
+          "locked": null,
+          "prunable": null,
+          "localOnly": null
+        }
+      ],
+      "branches": [
+        {
+          "name": "master",
+          "tip": "efa4fb99ab33f09c8131548b6a36251f83ed12b9",
+          "tipAt": "2026-11-05T15:10:00+09:00",
+          "subject": "Work on master",
+          "upstream": "origin/master",
+          "upstreamGone": false,
+          "ahead": 17,
+          "behind": 0,
+          "baseAhead": 17,
+          "baseBehind": 0,
+          "merged": false,
+          "localOnly": { "commits": 5, "oldestAt": "2026-10-20T10:00:00+09:00" },
+          "checkedOutBy": [{ "path": "C:\\Projects\\Popup", "slot": "Popup" }]
+        },
+        {
+          "name": "feature/popup-intro",
+          "tip": "bfa862675a550e62721691e44b431fdeedb07256",
+          "tipAt": "2026-11-05T15:10:00+09:00",
+          "subject": "Work on popup-intro",
+          "upstream": null,
+          "upstreamGone": false,
+          "ahead": null,
+          "behind": null,
+          "baseAhead": 3,
+          "baseBehind": 0,
+          "merged": false,
+          "localOnly": { "commits": 0, "oldestAt": null },
+          "checkedOutBy": []
+        }
+      ],
+      "stashes": [
+        {
+          "index": 0,
+          "sha": "114fdeb4c39f09a42702951d0a26893694a1cb26",
+          "at": "2026-11-03T12:00:00+09:00",
+          "branch": "master",
+          "message": "On master: temp shop prices"
+        }
+      ],
+      "localOnly": { "commits": 5, "oldestAt": "2026-10-20T10:00:00+09:00" },
+      "flags": ["local-only-old"],
+      "error": null
+    },
+    {
+      "commonDir": "C:\\Projects\\Popup-Windows\\.git",
+      "project": "my-org/popup",
+      "repo": "Popup",
+      "level": "full",
+      "layout": "clone",
+      "hub": null,
+      "lastFetchAt": "2026-11-06T18:12:00+09:00",
+      "defaultBranch": "origin/master",
+      "folders": [
+        {
+          "path": "C:\\Projects\\Popup-Windows",
+          "slot": "Popup-Windows",
+          "main": true,
+          "branch": "master",
+          "head": "b9483c77289fdaca2e3a0b0b7473d83af60618ed",
+          "detached": false,
+          "locked": null,
+          "prunable": null,
+          "localOnly": null
+        }
+      ],
+      "branches": [
+        {
+          "name": "master",
+          "tip": "b9483c77289fdaca2e3a0b0b7473d83af60618ed",
+          "tipAt": "2026-11-05T15:10:00+09:00",
+          "subject": "Work on master",
+          "upstream": "origin/master",
+          "upstreamGone": false,
+          "ahead": 0,
+          "behind": 0,
+          "baseAhead": 0,
+          "baseBehind": 0,
+          "merged": true,
+          "localOnly": { "commits": 0, "oldestAt": null },
+          "checkedOutBy": [{ "path": "C:\\Projects\\Popup-Windows", "slot": "Popup-Windows" }]
+        },
+        {
+          "name": "build/windows",
+          "tip": "908715913880536d71e20da469dd6b0eb37708cb",
+          "tipAt": "2026-11-05T15:10:00+09:00",
+          "subject": "Work on windows",
+          "upstream": null,
+          "upstreamGone": false,
+          "ahead": null,
+          "behind": null,
+          "baseAhead": 1,
+          "baseBehind": 0,
+          "merged": false,
+          "localOnly": { "commits": 0, "oldestAt": null },
+          "checkedOutBy": []
+        }
+      ],
+      "stashes": [],
+      "localOnly": { "commits": 0, "oldestAt": null },
+      "flags": [],
+      "error": null
+    },
+    {
+      "commonDir": "C:\\Projects\\Popup-Agent\\.git",
+      "project": "my-org/popup",
+      "repo": "Popup",
+      "level": "full",
+      "layout": "clone",
+      "hub": null,
+      "lastFetchAt": "2026-11-06T18:12:00+09:00",
+      "defaultBranch": "origin/master",
+      "folders": [
+        {
+          "path": "C:\\Projects\\Popup-Agent",
+          "slot": "Popup-Agent",
+          "main": true,
+          "branch": "master",
+          "head": "b41e289563608c966a4a73f42e9651ff3516c14b",
+          "detached": false,
+          "locked": null,
+          "prunable": null,
+          "localOnly": null
+        }
+      ],
+      "branches": [
+        {
+          "name": "master",
+          "tip": "b41e289563608c966a4a73f42e9651ff3516c14b",
+          "tipAt": "2026-11-05T15:10:00+09:00",
+          "subject": "Work on master",
+          "upstream": "origin/master",
+          "upstreamGone": false,
+          "ahead": 0,
+          "behind": 40,
+          "baseAhead": 0,
+          "baseBehind": 0,
+          "merged": true,
+          "localOnly": { "commits": 0, "oldestAt": null },
+          "checkedOutBy": [{ "path": "C:\\Projects\\Popup-Agent", "slot": "Popup-Agent" }]
+        }
+      ],
+      "stashes": [],
+      "localOnly": { "commits": 0, "oldestAt": null },
+      "flags": [],
+      "error": null
+    }
+  ],
+  "branchViews": [
+    {
+      "project": "my-org/my-game",
+      "repo": "MyGame",
+      "path": "C:\\Views\\MyGame.git",
+      "createdAt": "2026-11-02T10:00:00+09:00",
+      "updatedAt": "2026-11-06T11:20:00+09:00",
+      "coreVersion": "0.7.0",
+      "slots": [
+        { "slot": "MyGame", "remote": "MyGame", "status": "fetched", "fetchedAt": "2026-11-06T11:20:00+09:00", "changedSince": true, "error": null },
+        { "slot": "MyGame-1", "remote": "MyGame-1", "status": "unchanged", "fetchedAt": "2026-11-05T09:00:00+09:00", "changedSince": false, "error": null },
+        {
+          "slot": "MyGame-WebGL",
+          "remote": "MyGame-WebGL",
+          "status": "fetched",
+          "fetchedAt": "2026-11-06T11:20:00+09:00",
+          "changedSince": false,
+          "error": null
+        },
+        { "slot": "MyGame-Agent", "remote": "MyGame-Agent", "status": "fetched", "fetchedAt": "2026-11-06T11:20:00+09:00", "changedSince": true, "error": null },
+        {
+          "slot": "MyGame-release",
+          "remote": "MyGame-release",
+          "status": "fetched",
+          "fetchedAt": "2026-11-06T11:20:00+09:00",
+          "changedSince": false,
+          "error": null
+        }
+      ],
+      "origin": {
+        "filledFrom": "MyGame",
+        "rejected": [
+          {
+            "name": "origin/feature/old-chat-prototype",
+            "viewSha": "d0f73a77dccfbfece35d972c782c17f9546e3eb4",
+            "slotSha": "30142e72222c9c465d1df06204a0ab3f02b5f97e"
+          }
+        ]
+      },
+      "error": null
+    }
+  ]
 }
