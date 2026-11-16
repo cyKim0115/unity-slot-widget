@@ -1,0 +1,51 @@
+/*
+ * Page base: derived tokens, type, body. Adapted from https://github.com/cyKim0115/Frond/ @99d89bc,
+ * MIT, same author (src/style.css :root and html/body rules).
+ */
+
+:root {
+  /* derived from the color tokens; hover and pressed overlays follow whatever is under them */
+  --hover: color-mix(in srgb, var(--fg) 7%, transparent);
+  --pressed: color-mix(in srgb, var(--fg) 12%, transparent);
+  --selected-bg: color-mix(in srgb, var(--accent) 13%, var(--bg));
+  --font-ui: "Pretendard", "Malgun Gothic", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: "Cascadia Code", Consolas, "Courier New", monospace, "Malgun Gothic";
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  font-family: var(--font-ui);
+  color: var(--fg);
+  background: var(--bg);
+  overflow: hidden;
+  /* UI sentences do not break inside a Korean word */
+  word-break: keep-all;
+  overflow-wrap: anywhere;
+}
+
+button,
+input,
+select {
+  font: inherit;
+  color: inherit;
+}
+
+::selection {
+  background: color-mix(in srgb, var(--accent) 30%, var(--bg));
+  color: var(--fg);
+}
+
+/* Thin scrollbars in the theme colors (Chromium / WebView2) */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in srgb, var(--fg) 22%, var(--bg)) transparent;
+}

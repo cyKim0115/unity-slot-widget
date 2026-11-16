@@ -1,0 +1,764 @@
+/*
+ * App frame: title bar strips, side panel, list and details columns, banner, status bar, popups.
+ * Adapted from https://github.com/cyKim0115/Frond/ @99d89bc, MIT, same author (src/style.css: grid,
+ * .col-header, .icon-btn, nav, resizer, caption buttons, banner, status bar, .modal, dialog, menu).
+ * Changed: the list takes the free width and the details column on the right is the sized one; the
+ * banner spans both; the caption buttons sit in a cluster pinned to the top right so they stay when
+ * the details column is hidden; colors are tokens only (no literals); no product name in CSS content.
+ *
+ * Widths: 1000px and up, three columns. 720-999px, the side panel opens over the list.
+ * Below 720px the details column hides and the selected row opens in place.
+ */
+
+:root {
+  --titlebar-h: 36px;
+  --toggle-w: 44px;
+  --statusbar-h: 24px;
+  --nav-w: 248px;
+  --body-w: 420px;
+  /* pin, menu, settings (3 x 28 + gaps) + three 46px caption buttons */
+  --controls-w: 236px;
+  --panel-dur: 240ms;
+  --panel-ease: cubic-bezier(0.2, 0, 0, 1);
+}
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --panel-dur: 0ms;
+  }
+}
+
+#app {
+  position: relative;
+  height: 100%;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) 0 var(--body-w);
+  grid-template-rows: var(--titlebar-h) auto minmax(0, 1fr) var(--statusbar-h);
+}
+#app[data-body="hidden"] {
+  grid-template-columns: auto minmax(0, 1fr) 0 0;
+}
+/* The first paint with saved state, and dragging a width: no animation */
+#app.no-anim *,
+#app.resizing * {
+  transition: none !important;
+}
+#app.resizing,
+#app.resizing * {
+  cursor: col-resize !important;
+  user-select: none;
+}
+
+/* ---- shared: header strips and icon buttons ---- */
+
+/* Title bar strip: no text cursor and no selection, it reads as a window move area */
+.col-header {
+  flex: none;
+  height: var(--titlebar-h);
+  display: flex;
+  align-items: center;
+  cursor: default;
+  user-select: none;
+}
+.icon-btn {
+  position: relative;
+  display: inline-grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  background: none;
+  color: var(--muted);
+  cursor: pointer;
+}
+.icon-btn.small {
+  width: 22px;
+  height: 22px;
+  border-radius: 4px;
+}
+.icon-btn:hover {
+  background: var(--hover);
+  color: var(--fg);
+}
+.icon-btn:active {
+  background: var(--pressed);
+}
+.icon-btn:disabled {
+  opacity: 0.4;
+  pointer-events: none;
+}
+.icon-btn:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+.icon-btn svg {
+  width: 16px;
+  height: 16px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.4;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.icon-btn.small svg {
+  width: 14px;
+  height: 14px;
+}
+.icon-btn[aria-pressed="true"] {
+  background: var(--pressed);
+  color: var(--fg);
+}
+
+/* The toggle stays at the top left even when the panel is closed; the strip under it makes room */
+#nav-toggle {
+  position: absolute;
+  z-index: 6;
+  top: calc((var(--titlebar-h) - 28px) / 2);
+  left: calc((var(--toggle-w) - 28px) / 2);
+}
+#app[data-nav="open"] #nav-toggle {
+  color: var(--fg);
+}
+
+/* ---- side panel: only the outer width moves (0 <-> --nav-w); the inner box keeps its width so lists do not rewrap ---- */
+
+#nav {
+  grid-column: 1;
+  grid-row: 1 / 4;
+  width: 0;
+  overflow: hidden;
+  background: var(--sidebar-bg);
+  transition: width var(--panel-dur) var(--panel-ease);
+}
+#app[data-nav="open"] #nav {
+  width: var(--nav-w);
+}
+.nav-inner {
+  width: var(--nav-w);
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  border-right: 1px solid var(--line);
+  font-size: 13px;
+  opacity: 0;
+  transform: translateX(-12px);
+  transition:
+    opacity var(--panel-dur) var(--panel-ease),
+    transform var(--panel-dur) var(--panel-ease);
+}
+#app[data-nav="open"] .nav-inner {
+  opacity: 1;
+  transform: none;
+}
+#nav .col-header {
+  padding-left: var(--toggle-w);
+  gap: 2px;
+}
+#nav-tabs {
+  display: flex;
+  gap: 2px;
+}
+.nav-tab[aria-selected="true"] {
+  background: var(--pressed);
+  color: var(--fg);
+}
+.nav-badge {
+  position: absolute;
+  top: 1px;
+  right: 0;
+  min-width: 14px;
+  height: 14px;
+  padding: 0 3px;
+  border-radius: 7px;
+  background: var(--accent);
+  color: var(--on-accent);
+  font-size: 9px;
+  font-weight: 700;
+  line-height: 14px;
+  text-align: center;
+}
+.nav-badge[data-level="critical"] {
+  background: var(--danger);
+  color: var(--on-danger);
+}
+.nav-badge[hidden] {
+  display: none;
+}
+
+.nav-panel {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.nav-panel[hidden] {
+  display: none;
+}
+.panel-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 26px;
+  padding: 2px 8px 4px 14px;
+}
+.panel-head h2 {
+  margin: 0;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: var(--muted);
+}
+.panel-body {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding: 0 6px 10px;
+}
+.panel-empty {
+  margin: 4px 8px;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+/* ---- list column ---- */
+
+#list-head {
+  grid-column: 2;
+  grid-row: 1;
+  min-width: 0;
+  padding-left: 8px;
+  gap: 2px;
+  background: var(--bg);
+  border-bottom: 1px solid var(--line);
+  transition: padding-left var(--panel-dur) var(--panel-ease);
+}
+/* With the side panel closed, the toggle sits on this strip */
+#app[data-nav="closed"] #list-head {
+  padding-left: var(--toggle-w);
+}
+/* With the details column hidden, the caption cluster sits on this strip */
+#app[data-body="hidden"] #list-head {
+  padding-right: var(--controls-w);
+}
+#view-tabs {
+  display: flex;
+  gap: 2px;
+  min-width: 0;
+}
+.view-tab {
+  height: 26px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 6px;
+  background: none;
+  color: var(--muted);
+  font-size: 13px;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.view-tab:hover {
+  background: var(--hover);
+  color: var(--fg);
+}
+.view-tab[aria-selected="true"] {
+  background: var(--pressed);
+  color: var(--fg);
+  font-weight: 600;
+}
+.view-tab:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+
+#list-main {
+  grid-column: 2;
+  grid-row: 3;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg);
+}
+
+/* ---- details column and its handle (a zero-width element with a grab area on both sides) ---- */
+
+#body-resizer {
+  grid-column: 3;
+  grid-row: 3;
+  position: relative;
+  z-index: 2;
+  width: 0;
+  outline: none;
+}
+#body-resizer::before {
+  content: "";
+  position: absolute;
+  inset: 0 -4px 0 -4px;
+  cursor: col-resize;
+}
+#body-resizer::after {
+  content: "";
+  position: absolute;
+  inset: 0 -2px 0 -1px;
+  background: var(--accent);
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+#body-resizer:hover::after {
+  opacity: 1;
+  transition-delay: 0.15s;
+}
+#app.resizing #body-resizer::after,
+#body-resizer:focus-visible::after {
+  opacity: 1;
+}
+
+#body-head {
+  grid-column: 4;
+  grid-row: 1;
+  min-width: 0;
+  padding: 0 var(--controls-w) 0 14px;
+  border-left: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+  background: var(--bg);
+}
+#body-title {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 13px;
+  font-weight: 600;
+}
+#body-main {
+  grid-column: 4;
+  grid-row: 3;
+  min-width: 0;
+  min-height: 0;
+  overflow: auto;
+  border-left: 1px solid var(--line);
+  background: var(--bg);
+  outline: none;
+}
+#app[data-body="hidden"] #body-head,
+#app[data-body="hidden"] #body-main,
+#app[data-body="hidden"] #body-resizer {
+  display: none;
+}
+
+/* ---- caption cluster (pin, menu, settings, window buttons), pinned to the top right ---- */
+
+#title-controls {
+  position: absolute;
+  z-index: 5;
+  top: 0;
+  right: 0;
+  height: var(--titlebar-h);
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+#settings-btn {
+  margin-right: 6px;
+}
+#window-controls {
+  display: flex;
+  align-self: stretch;
+}
+#window-controls button {
+  width: 46px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--fg);
+  font-family: "Segoe Fluent Icons", "Segoe MDL2 Assets", sans-serif;
+  font-size: 10px;
+  cursor: default;
+}
+#window-controls button:hover {
+  background: var(--hover);
+}
+#window-controls button:active {
+  background: var(--pressed);
+}
+#window-controls button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+#window-controls #win-close:hover,
+#window-controls #win-close:active {
+  background: var(--caption-close);
+  color: var(--on-caption-close);
+}
+
+/* ---- banner: one thing to act on now, across the list and the details ---- */
+
+#banner {
+  grid-column: 2 / 5;
+  grid-row: 2;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px 10px;
+  padding: 6px 8px 6px 12px;
+  background: color-mix(in srgb, var(--accent) 14%, var(--bg));
+  border-bottom: 1px solid var(--line);
+  font-size: 13px;
+}
+#banner.warn {
+  background: color-mix(in srgb, var(--danger) 13%, var(--bg));
+}
+#banner[hidden] {
+  display: none;
+}
+#banner-text {
+  flex: 1;
+  min-width: 0;
+}
+#banner-actions {
+  display: flex;
+  gap: 6px;
+}
+#banner-actions button {
+  padding: 2px 10px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--bg);
+  color: var(--fg);
+  font-size: 12px;
+  cursor: pointer;
+}
+#banner-actions button:hover {
+  background: color-mix(in srgb, var(--fg) 7%, var(--bg));
+}
+#banner-actions button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+/* ---- status bar ---- */
+
+#statusbar {
+  grid-column: 1 / 5;
+  grid-row: 4;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 0 10px;
+  border-top: 1px solid var(--line);
+  background: var(--sidebar-bg);
+  color: var(--muted);
+  font-size: 12px;
+  white-space: nowrap;
+  overflow: hidden;
+}
+#statusbar .spacer {
+  flex: 1;
+}
+#statusbar > * {
+  flex: none;
+}
+/* Items that can be pressed look like the bar; underline on hover */
+#statusbar button {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  cursor: pointer;
+}
+#statusbar button:hover {
+  color: var(--fg);
+  text-decoration: underline;
+}
+#statusbar button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+#statusbar [hidden],
+#statusbar .dropped {
+  display: none;
+}
+#statusbar .warn {
+  color: var(--warn);
+}
+#statusbar .hot {
+  color: var(--hot);
+}
+#status-path {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  text-align: left;
+}
+#status-path.flash {
+  color: var(--fg);
+}
+.busy-dot {
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  margin-right: 5px;
+  border-radius: 50%;
+  background: var(--accent);
+  vertical-align: 1px;
+  animation: busy-pulse 0.9s ease-in-out infinite alternate;
+}
+.busy-dot[hidden] {
+  display: none;
+}
+@keyframes busy-pulse {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0.3;
+  }
+}
+
+/* ---- narrow windows ---- */
+
+@media (max-width: 999px) {
+  #app {
+    grid-template-columns: 0 minmax(0, 1fr) 0 var(--body-w);
+  }
+  #app[data-body="hidden"] {
+    grid-template-columns: 0 minmax(0, 1fr) 0 0;
+  }
+  /* The side panel opens over the list; an outside press closes it (nav.ts) */
+  #nav {
+    position: absolute;
+    z-index: 4;
+    top: 0;
+    bottom: var(--statusbar-h);
+    left: 0;
+    grid-column: auto;
+    grid-row: auto;
+  }
+  #app[data-nav="open"] #nav {
+    box-shadow: 0 12px 32px rgb(0 0 0 / 0.22);
+  }
+  #app #list-head {
+    padding-left: var(--toggle-w);
+  }
+}
+@media (max-width: 719px) {
+  #app,
+  #app[data-body="hidden"] {
+    grid-template-columns: 0 minmax(0, 1fr) 0 0;
+  }
+  #body-head,
+  #body-main,
+  #body-resizer {
+    display: none;
+  }
+  #app #list-head {
+    padding-right: var(--controls-w);
+  }
+}
+
+/* ---- popups (.modal): notices and confirmations (dialog.ts) ---- */
+
+.modal {
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--bg);
+  color: var(--fg);
+  box-shadow: 0 16px 48px rgb(0 0 0 / 0.28);
+  font-size: 13px;
+}
+.modal[open] {
+  animation: modal-in 160ms var(--panel-ease);
+}
+/* Dims what is behind a popup (not window transparency) */
+.modal::backdrop {
+  background: rgb(0 0 0 / 0.32);
+}
+.modal[open]::backdrop {
+  animation: backdrop-in 160ms ease-out;
+}
+@keyframes modal-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.98);
+  }
+}
+@keyframes backdrop-in {
+  from {
+    opacity: 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .modal[open],
+  .modal[open]::backdrop {
+    animation: none;
+  }
+}
+.modal button:not(.icon-btn) {
+  min-width: 72px;
+  padding: 5px 14px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--bg);
+  color: var(--fg);
+  cursor: pointer;
+}
+.modal button:not(.icon-btn):hover {
+  background: var(--hover);
+}
+.modal button[hidden] {
+  display: none;
+}
+.modal button:not(.icon-btn):focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+.modal button.primary {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: var(--on-accent);
+}
+.modal button.danger {
+  border-color: var(--danger);
+  background: var(--danger);
+  color: var(--on-danger);
+}
+.modal button.primary:hover,
+.modal button.danger:hover {
+  filter: brightness(1.08);
+}
+
+#app-dialog {
+  width: min(400px, calc(100vw - 32px));
+}
+#app-dialog form {
+  padding: 18px 20px 16px;
+}
+#dialog-title {
+  margin: 0 0 8px;
+  font-size: 15px;
+  font-weight: 600;
+}
+#dialog-message {
+  margin: 0;
+  line-height: 1.55;
+  white-space: pre-line;
+}
+#dialog-detail {
+  margin: 10px 0 0;
+  padding: 6px 8px;
+  border-radius: 6px;
+  background: var(--sidebar-bg);
+  color: var(--muted);
+  font-size: 12px;
+  white-space: pre-line;
+  max-height: 40vh;
+  overflow: auto;
+  user-select: text;
+}
+#dialog-detail[hidden] {
+  display: none;
+}
+.dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 18px;
+}
+/* Cancel (empty value) goes to the far left in a row; the confirming buttons gather at the right */
+.dialog-actions:not(.vertical) button[value=""] {
+  order: -1;
+  margin-right: auto;
+}
+.dialog-actions.vertical {
+  flex-direction: column;
+  align-items: stretch;
+}
+.dialog-actions.vertical button {
+  text-align: left;
+}
+
+/* ---- menus (context-menu.ts): a popover in the top layer, placed by left/top ---- */
+
+#context-menu {
+  inset: auto;
+  margin: 0;
+  min-width: 180px;
+  max-width: min(420px, calc(100vw - 16px));
+  padding: 4px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--bg);
+  color: var(--fg);
+  box-shadow: 0 8px 24px rgb(0 0 0 / 0.22);
+  font-size: 13px;
+}
+#context-menu button {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  width: 100%;
+  padding: 5px 10px;
+  border: 0;
+  border-radius: 5px;
+  background: none;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+#context-menu button:hover,
+#context-menu button:focus-visible {
+  background: var(--hover);
+  outline: none;
+}
+#context-menu button:disabled {
+  color: var(--muted);
+  cursor: default;
+}
+#context-menu button:disabled:hover {
+  background: none;
+}
+#context-menu button.danger {
+  color: var(--hot);
+}
+#context-menu .menu-label {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+#context-menu .menu-shortcut {
+  flex: none;
+  color: var(--muted);
+  /* A Korean UI font draws a backslash (Ctrl+backslash) as a won sign */
+  font-family: "Segoe UI", system-ui, sans-serif;
+  font-size: 12px;
+}
+/* Checkbox items: a check mark before the label, its room kept when unchecked */
+#context-menu [role="menuitemcheckbox"]::before {
+  content: "";
+  flex: none;
+  width: 10px;
+  height: 6px;
+  margin: -3px -8px 0 0;
+  border-left: 1.5px solid currentColor;
+  border-bottom: 1.5px solid currentColor;
+  transform: rotate(-45deg);
+  visibility: hidden;
+}
+#context-menu [role="menuitemcheckbox"][aria-checked="true"]::before {
+  visibility: visible;
+}
+#context-menu .menu-separator {
+  height: 1px;
+  margin: 4px 6px;
+  background: var(--line);
+}

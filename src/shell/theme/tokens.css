@@ -1,0 +1,44 @@
+/*
+ * Color tokens, light values. Dark values: dark.css (same names).
+ * Adapted from https://github.com/cyKim0115/Frond/ @99d89bc, MIT, same author (src/style.css :root,
+ * the sage charcoal palette). The eight shell tokens keep Frond's names and values; the status tokens
+ * are this app's. Every token is a solid color (no alpha): the window is opaque.
+ *
+ * Text rules, kept by theme.test.ts (WCAG 4.5:1):
+ * - fg, muted, warn, hot, info, batch: text on bg, sidebar-bg, tint-warn and tint-hot;
+ * - accent: text on bg only (on sidebar-bg it is a fill or an outline);
+ * - ok: dots and other marks only (3:1);
+ * - on-accent on accent, on-danger on danger, on-caption-close on caption-close.
+ * theme.ts registers these names with CSS.registerProperty so a theme change fades (html.theme-anim).
+ */
+
+:root {
+  /* shell (Frond) */
+  --fg: #2c3333;
+  --bg: #fcfdfc;
+  --muted: #515b56;
+  --line: #dae1da;
+  --accent: #567e65;
+  --on-accent: #ffffff;
+  --danger: #cf222e;
+  --sidebar-bg: #f0f3f0;
+
+  /* status: ready = ok (the accent hue), starting and attention = warn (amber), stalled and
+     critical = hot, closed = muted, batch = indigo, info = blue (pull counts, platform) */
+  --ok: #567e65;
+  --warn: #8a5a00;
+  --hot: #c4202b;
+  --info: #2b6496;
+  --batch: #4b53a8;
+  /* row backgrounds and their edges, mixed with bg in advance */
+  --tint-warn: #f8f0e2;
+  --tint-warn-line: #efd7b4;
+  --tint-hot: #f8eeed;
+  --tint-hot-line: #ebbbbd;
+  /* fixed colors that used to be literals */
+  --on-danger: #ffffff;
+  --caption-close: #c42b1c;
+  --on-caption-close: #ffffff;
+
+  color-scheme: light;
+}
