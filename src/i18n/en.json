@@ -1,9 +1,6 @@
 {
   "app.title": "Unity slots",
-  "header.open": "{open}/{max} open",
   "header.commit": "Commit {percent}%",
-  "header.refresh": "Refresh",
-  "header.menu": "Menu",
 
   "state.closed": "Closed",
   "state.starting": "Starting",
@@ -19,11 +16,9 @@
   "row.worktree": "worktree",
   "row.lastClosed": "last {time}",
   "row.lease": "lease {owner}",
-  "row.leaseFor": "for {duration}",
   "row.leaseExpired": "expired",
   "row.leaseClientGone": "holder gone",
   "row.openCount": "{open}/{total} open",
-  "row.moreLess": "Collapse",
 
   "git.changes": "{n} uncommitted change(s)",
   "git.ahead": "{n} commit(s) not pushed",
@@ -50,7 +45,6 @@
   "sys.commit-critical": "System commit {percent}% — close an editor",
   "sys.editors-at-max": "{open}/{max} editors open",
   "sys.other": "{flag}",
-  "warnings.more": "{n} more",
 
   "footer.unregistered": "Unregistered editors {n}",
   "footer.orphans": "Orphan workers {n}",
@@ -103,7 +97,7 @@
   "toast.unityBatch": "A batchmode Unity is using this slot. Open it when that ends.",
   "toast.unityLock": "Temp\\UnityLockfile is held. Check Task Manager.",
   "toast.unityBusy": "Another slot is still opening",
-  "toast.unityTimeout": "No answer yet. Check the card in a moment.",
+  "toast.unityTimeout": "No answer yet. Check the list in a moment.",
   "toast.unityFailed": "Could not open Unity: {text}",
   "toast.windowNotFound": "Unity window not found",
 
@@ -129,7 +123,6 @@
   "open.vscode": "VS Code",
   "open.explorer": "File Explorer",
 
-  "events.title": "Recent events",
   "events.empty": "No events yet",
   "event.open": "open",
   "event.ready": "ready",
@@ -260,6 +253,7 @@
   "status.editors": "Editors {open}/{max}",
   "status.editorsTitle": "Show open slots only",
   "status.editorsAll": "Show all slots",
+  "status.noAnswer": "No answer",
   "status.updatedTitle": "Refresh menu",
   "status.git": "git {time}",
   "status.gitTitle": "Last detailed git check · click to run it now",

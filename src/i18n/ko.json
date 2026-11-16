@@ -1,9 +1,6 @@
 {
   "app.title": "Unity 슬롯",
-  "header.open": "열림 {open}/{max}",
   "header.commit": "커밋 {percent}%",
-  "header.refresh": "새로고침",
-  "header.menu": "메뉴",
 
   "state.closed": "닫힘",
   "state.starting": "여는 중",
@@ -19,11 +16,9 @@
   "row.worktree": "워크트리",
   "row.lastClosed": "마지막 {time}",
   "row.lease": "임대 {owner}",
-  "row.leaseFor": "{duration}째",
   "row.leaseExpired": "만료",
   "row.leaseClientGone": "주인 꺼짐",
   "row.openCount": "{open}/{total} 열림",
-  "row.moreLess": "접기",
 
   "git.changes": "커밋 안 한 변경 {n}건",
   "git.ahead": "푸시 안 된 커밋 {n}",
@@ -50,7 +45,6 @@
   "sys.commit-critical": "시스템 커밋 {percent}% — 에디터를 줄이세요",
   "sys.editors-at-max": "열린 에디터 {open}/{max}",
   "sys.other": "{flag}",
-  "warnings.more": "외 {n}건",
 
   "footer.unregistered": "등록 안 된 에디터 {n}",
   "footer.orphans": "고아 워커 {n}",
@@ -97,13 +91,13 @@
   "toast.openFailed": "열지 못했어요: {text}",
   "toast.unityOpening": "{slot} Unity를 띄우는 중…",
   "toast.unityStarted": "{slot} Unity를 띄웠어요. 준비까지 12초~몇 분 걸려요.",
-  "toast.unityStartedTight": "{slot} Unity를 띄웠어요. 에디터 수나 메모리 여유가 적어요(경고 띠 참고).",
+  "toast.unityStartedTight": "{slot} Unity를 띄웠어요. 에디터 수나 메모리 여유가 적어요(경고 참고).",
   "toast.unityAlreadyOpen": "{slot}은(는) 이미 열려 있어요",
   "toast.unityMissing": "Unity {version}이(가) 설치돼 있지 않아요",
   "toast.unityBatch": "배치 Unity가 이 슬롯을 쓰는 중이에요. 끝난 뒤 여세요.",
   "toast.unityLock": "Temp\\UnityLockfile이 잠겨 있어요. 작업 관리자를 확인하세요.",
   "toast.unityBusy": "다른 슬롯을 여는 중이에요",
-  "toast.unityTimeout": "응답이 늦어요. 잠시 뒤 카드를 확인하세요.",
+  "toast.unityTimeout": "응답이 늦어요. 잠시 뒤 목록을 확인하세요.",
   "toast.unityFailed": "Unity를 열지 못했어요: {text}",
   "toast.windowNotFound": "Unity 창을 찾지 못했어요",
 
@@ -129,7 +123,6 @@
   "open.vscode": "VS Code",
   "open.explorer": "탐색기",
 
-  "events.title": "최근 이벤트",
   "events.empty": "기록이 아직 없어요",
   "event.open": "열기",
   "event.ready": "준비됨",
@@ -260,6 +253,7 @@
   "status.editors": "에디터 {open}/{max}",
   "status.editorsTitle": "열린 슬롯만 보기",
   "status.editorsAll": "모든 슬롯 보기",
+  "status.noAnswer": "응답 없음",
   "status.updatedTitle": "새로고침 메뉴",
   "status.git": "git {time}",
   "status.gitTitle": "마지막 자세한 git 확인 · 눌러서 지금 확인",

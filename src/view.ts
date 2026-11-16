@@ -1,12 +1,11 @@
 /**
- * HTML for the widget body. Every value from the dashboard goes through `esc`.
- * The look follows the author's other widgets (Repo Multi-Check, Claude Usage, ...):
- * uppercase captions, card rows, round pills, and the same graphite colors with a blue accent.
+ * HTML for the slot rows and their details. Every value from the dashboard goes through `esc`.
+ * Rows keep the widget's drawing: name line, state line, colored numbers without backgrounds.
  */
-import type { Dashboard, GitState, Slot, SlotEvent, WidgetSettings } from "./types";
+import type { Dashboard, GitState, Slot, WidgetSettings } from "./types";
 import { formatDuration, formatGb, formatWhen, t } from "./i18n";
 import { icon } from "./icons";
-import { elapsedSince, isOpen, localOnlyDays, type Warning } from "./model";
+import { elapsedSince, isOpen, localOnlyDays } from "./model";
 
 export function esc(value: unknown): string {
   return String(value ?? "")
@@ -28,7 +27,7 @@ const PLATFORM: Record<string, string> = {
   linux: "LNX",
 };
 
-function platformChip(platform: string | null | undefined): string {
+export function platformChip(platform: string | null | undefined): string {
   if (!platform) return "";
   const code = PLATFORM[platform.toLowerCase()] ?? platform.slice(0, 3).toUpperCase();
   return `<span class="chip" title="${esc(platform)}">${esc(code)}</span>`;
@@ -39,7 +38,7 @@ function shortOwner(owner: string): string {
 }
 
 /** A span the 1-second ticker keeps up to date. */
-function since(iso: string | null | undefined, now: Date): string {
+export function since(iso: string | null | undefined, now: Date): string {
   const ms = elapsedSince(iso, now);
   if (ms === null) return "";
   return `<span data-since="${esc(iso)}">${esc(formatDuration(ms))}</span>`;
@@ -151,7 +150,7 @@ function detailRow(label: string, value: string): string {
   return `<div class="d-label">${esc(label)}</div><div class="d-value">${value}</div>`;
 }
 
-function details(slot: Slot, ctx: RowContext): string {
+export function details(slot: Slot, ctx: RowContext): string {
   const none = t("detail.none");
   const e = slot.editor;
   const rows: string[] = [];
@@ -301,7 +300,7 @@ export function slotList(doc: Dashboard, ctx: RowContext): string {
   for (const [name, members] of groups) {
     const openCount = members.filter(isOpen).length;
     const sorted = [...members.filter(isOpen), ...members.filter((s) => !isOpen(s))];
-    html.push(`<section class="group">
+    html.push(`<section class="group" data-group="${esc(name)}">
       <div class="section-label"><span>${esc(name)}</span>${pill(
         "plain",
         "",
@@ -312,40 +311,4 @@ export function slotList(doc: Dashboard, ctx: RowContext): string {
     </section>`);
   }
   return html.join("");
-}
-
-export function warningBand(list: Warning[], showAll: boolean): string {
-  if (!list.length) return "";
-  const shown = showAll ? list : list.slice(0, 2);
-  const more = list.length - shown.length;
-  return `<div class="band" data-action="toggle-warnings">${shown
-    .map((w) => `<div class="warn-line ${w.severity}">${icon("alert", 12)}<span>${esc(w.text)}</span></div>`)
-    .join("")}${more > 0 ? `<div class="warn-more">${esc(t("warnings.more", { n: more }))}</div>` : ""}</div>`;
-}
-
-export function eventsPanel(events: SlotEvent[], now: Date): string {
-  // Newest first whatever order the core sends (0.4 sends newest first, at most 20).
-  const items = [...events].sort((a, b) => (Date.parse(b.time) || 0) - (Date.parse(a.time) || 0)).slice(0, 20);
-  const body = items.length
-    ? items
-        .map((e) => {
-          const name = t(`event.${e.event}`);
-          return `<li><span class="ev-time">${esc(formatWhen(e.time, now))}</span><span class="ev-name">${esc(
-            name.startsWith("event.") ? e.event : name,
-          )}</span><span class="ev-slot">${esc(e.slot ?? "")}</span><span class="ev-owner">${esc(e.owner ?? "")}</span></li>`;
-        })
-        .join("")
-    : `<li class="muted">${esc(t("events.empty"))}</li>`;
-  return `<section class="group events"><div class="section-label"><span>${esc(t("events.title"))}</span></div><ul>${body}</ul></section>`;
-}
-
-/** Header pills: open editors and system commit, colored by the alert settings. */
-export function headerPills(open: number, max: number, percent: number | undefined, settings: WidgetSettings): string {
-  // Muted unless something needs attention, like the plan text in the Claude widget.
-  const out = [pill(open >= max && max > 0 ? "warn" : "plain", "", t("header.open", { open, max }), t("header.open", { open, max }))];
-  if (typeof percent === "number") {
-    const kind = percent >= settings.commitCriticalPercent ? "hot" : percent >= settings.commitWarnPercent ? "warn" : "plain";
-    out.push(pill(kind, "", t("header.commit", { percent }), t("header.commit", { percent })));
-  }
-  return out.join('<span class="sep">·</span>');
 }

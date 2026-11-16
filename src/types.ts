@@ -173,6 +173,12 @@ export interface WidgetSettings {
   openTarget: OpenTarget;
   unitySlotScript: string;
   sampleFile: string;
+  /** system | light | dark (default system). The three below are optional: an older build of the Rust side does not send them. */
+  theme?: "system" | "light" | "dark";
+  /** Theme fade in ms, 0 to 1000 (default 250). */
+  themeDurationMs?: number;
+  /** Main window always on top: the title bar pin (default false; the old `alwaysOnTop` is not read). */
+  windowOnTop?: boolean;
 }
 
 export interface CoreLocation {
