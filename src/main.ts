@@ -552,7 +552,7 @@ function paintList() {
     list.setAttribute("aria-label", t("view.branchesLabel"));
     branchList = buildBranchList(branchData, { filter: branchFilter, project, slot: branchSlot, find: findText, collapsed: branchCollapsed });
     if (!slots().length) inner.innerHTML = `<p class="empty">${esc(t("empty.noSlots"))}</p>`;
-    else if (!branchList.keys.length) inner.innerHTML = `<p class="empty">${esc(t("list.noMatch"))}</p>`;
+    else if (!branchList.keys.length) inner.innerHTML = `<p class="empty">${esc(t("list.noBranchMatch"))}</p>`;
     else inner.innerHTML = branchListHtml(branchList, branchContext());
     markSelection(inner, list, branchSelected);
     return;
@@ -2063,7 +2063,7 @@ function applyPreviewQuery() {
   pendingBranchName = query.get("branch");
   const bf = query.get("bfilter");
   if (isBranchFilter(bf)) branchFilter = bf;
-  branchSlot = query.get("bslot");
+  branchSlot = query.get("bslot") || null;
   const tab = query.get("nav");
   if (tab === "closed") nav.setOpen(false);
   else if (tab) nav.show(tab);

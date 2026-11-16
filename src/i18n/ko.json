@@ -461,6 +461,7 @@
   "dialog.cancel": "취소",
   "list.label": "슬롯 목록",
   "list.noMatch": "맞는 슬롯이 없어요",
+  "list.noBranchMatch": "맞는 브랜치가 없어요",
   "find.label": "슬롯 찾기",
   "find.placeholder": "찾기 (Ctrl+F)",
   "filter.label": "목록 거르기",

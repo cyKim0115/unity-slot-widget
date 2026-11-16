@@ -461,6 +461,7 @@
   "dialog.cancel": "Cancel",
   "list.label": "Slot list",
   "list.noMatch": "No slot matches",
+  "list.noBranchMatch": "No branch matches",
   "find.label": "Find slots",
   "find.placeholder": "Find (Ctrl+F)",
   "filter.label": "Filter",
