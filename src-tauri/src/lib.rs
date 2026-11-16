@@ -18,12 +18,39 @@ fn get_settings() -> WidgetSettings {
     settings::load()
 }
 
+/// Stores only the keys in `patch` (merged into widget.json, which others edit too) and returns the
+/// settings now in effect. The window pin and the signal interval follow at once.
+#[tauri::command]
+fn update_settings(app: tauri::AppHandle, patch: serde_json::Map<String, serde_json::Value>) -> Result<WidgetSettings, String> {
+    let saved = settings::update(&patch)?;
+    apply_saved(&app, &saved);
+    Ok(saved)
+}
+
+/// The old settings window sends everything it holds; only the changed keys reach the file.
 #[tauri::command]
 fn save_settings(app: tauri::AppHandle, settings: WidgetSettings) -> Result<WidgetSettings, String> {
-    let saved = settings::save(settings)?;
-    signals::set_interval(saved.signal_secs);
+    let current = serde_json::to_value(settings::load()).map_err(|e| e.to_string())?;
+    let next = serde_json::to_value(&settings).map_err(|e| e.to_string())?;
+    let mut patch = serde_json::Map::new();
+    if let (serde_json::Value::Object(current), serde_json::Value::Object(next)) = (current, next) {
+        for (key, value) in next {
+            if current.get(&key) != Some(&value) {
+                patch.insert(key, value);
+            }
+        }
+    }
+    let saved = settings::update(&patch)?;
+    apply_saved(&app, &saved);
     app.emit("settings-saved", saved.clone()).map_err(|e| e.to_string())?;
     Ok(saved)
+}
+
+fn apply_saved(app: &tauri::AppHandle, saved: &WidgetSettings) {
+    signals::set_interval(saved.signal_secs);
+    if let Some(window) = app.get_webview_window(MAIN_LABEL) {
+        let _ = window.set_always_on_top(saved.window_on_top);
+    }
 }
 
 #[tauri::command]
@@ -36,7 +63,8 @@ fn get_core_location() -> paths::CoreLocation {
 #[tauri::command]
 async fn get_dashboard(git: String) -> Result<core::DashboardResult, String> {
     let s = settings::load();
-    tauri::async_runtime::spawn_blocking(move || core::dashboard(&git, &s.unity_slot_script, Some(s.sample_file)))
+    let sample = settings::sample_source(&s);
+    tauri::async_runtime::spawn_blocking(move || core::dashboard(&git, &s.unity_slot_script, sample))
         .await
         .map_err(|e| e.to_string())?
 }
@@ -162,6 +190,7 @@ pub fn run() {
         )
         .invoke_handler(tauri::generate_handler![
             get_settings,
+            update_settings,
             save_settings,
             get_core_location,
             get_dashboard,
@@ -186,7 +215,7 @@ pub fn run() {
             install::cleanup_debug_entry();
             let s = settings::load();
             if let Some(window) = app.get_webview_window(MAIN_LABEL) {
-                let _ = window.set_always_on_top(s.always_on_top);
+                let _ = window.set_always_on_top(s.window_on_top);
             }
             signals::set_interval(s.signal_secs);
             signals::start(app.handle().clone());
