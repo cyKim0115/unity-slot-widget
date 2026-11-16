@@ -61,21 +61,43 @@ fn badge(fill: [u8; 3], mark: Option<[u8; 3]>) -> Vec<u8> {
     rgba
 }
 
-static SHOWN: Mutex<String> = Mutex::new(String::new());
+/// The level the page asked for last, and the one set on the taskbar button now.
+struct Badge {
+    wanted: String,
+    shown: String,
+}
 
-/// Sets the taskbar badge for `level` (once per change).
-pub fn set_badge(window: &WebviewWindow, level: &str) {
-    let mut shown = SHOWN.lock().unwrap_or_else(|e| e.into_inner());
-    if *shown == level {
-        return;
-    }
-    let result = match colors(level) {
+static BADGE: Mutex<Badge> = Mutex::new(Badge { wanted: String::new(), shown: String::new() });
+
+fn apply(window: &WebviewWindow, badge_state: &mut Badge) {
+    let level = badge_state.wanted.clone();
+    let result = match colors(&level) {
         Some((fill, mark)) => window.set_overlay_icon(Some(Image::new_owned(badge(fill, mark), SIZE, SIZE))),
         None => window.set_overlay_icon(None),
     };
     if result.is_ok() {
-        *shown = level.to_string();
+        badge_state.shown = level;
     }
+}
+
+/// Sets the taskbar badge for `level` (once per change).
+pub fn set_badge(window: &WebviewWindow, level: &str) {
+    let mut state = BADGE.lock().unwrap_or_else(|e| e.into_inner());
+    state.wanted = level.to_string();
+    if state.shown == level {
+        return;
+    }
+    apply(window, &mut state);
+}
+
+/// Sets the last badge again. A window hidden to the tray loses its taskbar button, and the
+/// button made when it shows again has no badge: signals.rs calls this a tick after it is back.
+pub fn reapply(window: &WebviewWindow) {
+    let mut state = BADGE.lock().unwrap_or_else(|e| e.into_inner());
+    if state.wanted.is_empty() {
+        return;
+    }
+    apply(window, &mut state);
 }
 
 /// Flashes the taskbar button until the window comes to the front; nothing when it is in front.

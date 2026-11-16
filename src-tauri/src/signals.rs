@@ -22,7 +22,7 @@ use windows::Win32::System::Diagnostics::ToolHelp::{
     CreateToolhelp32Snapshot, Process32FirstW, Process32NextW, PROCESSENTRY32W, TH32CS_SNAPPROCESS,
 };
 
-use crate::paths;
+use crate::{paths, settings};
 
 /// Seconds between looks. The page can change it from settings.
 static INTERVAL_SECS: AtomicU64 = AtomicU64::new(3);
@@ -116,11 +116,18 @@ pub fn start(app: AppHandle) {
                 was_visible = true;
                 last = None;
                 last_settings = None;
+                // widget.json may have changed while hidden, and the new taskbar button has no badge
+                crate::appwindow::apply_settings(&app, &settings::load());
+                if let Some(window) = app.get_webview_window("main") {
+                    crate::overlay::reapply(&window);
+                }
                 let _ = app.emit_to("main", "widget-shown", ());
                 continue;
             }
             let settings_sig = settings_signature();
             if last_settings.is_some_and(|prev| prev != settings_sig) {
+                // The pin, the background and this interval apply here; the page takes the rest
+                crate::appwindow::apply_settings(&app, &settings::load());
                 let _ = app.emit_to("main", "settings-file-changed", ());
             }
             last_settings = Some(settings_sig);

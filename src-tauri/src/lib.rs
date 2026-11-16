@@ -23,16 +23,8 @@ fn get_settings() -> WidgetSettings {
 #[tauri::command]
 fn update_settings(app: tauri::AppHandle, patch: serde_json::Map<String, serde_json::Value>) -> Result<WidgetSettings, String> {
     let saved = settings::update(&patch)?;
-    apply_saved(&app, &saved);
+    appwindow::apply_settings(&app, &saved);
     Ok(saved)
-}
-
-fn apply_saved(app: &tauri::AppHandle, saved: &WidgetSettings) {
-    signals::set_interval(saved.signal_secs);
-    if let Some(window) = app.get_webview_window(MAIN_LABEL) {
-        let _ = window.set_always_on_top(saved.window_on_top);
-        appwindow::paint_background(&window, &saved.theme);
-    }
 }
 
 /// The page has painted once: show the window (minimized when Windows started it and the
@@ -185,13 +177,10 @@ pub fn run() {
         .setup(|app| {
             tray::install(app)?;
             install::cleanup_debug_entry();
-            let s = settings::load();
             if let Some(window) = app.get_webview_window(MAIN_LABEL) {
                 appwindow::import_old_position(app.handle(), &window);
-                appwindow::paint_background(&window, &s.theme);
-                let _ = window.set_always_on_top(s.window_on_top);
             }
-            signals::set_interval(s.signal_secs);
+            appwindow::apply_settings(app.handle(), &settings::load());
             signals::start(app.handle().clone());
             // The page normally asks for the first show; if it never does, show the window anyway
             let handle = app.handle().clone();

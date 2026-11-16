@@ -67,6 +67,17 @@ pub fn show_first(app: &AppHandle) {
     }
 }
 
+/// What the Rust side does with the settings: the window pin, the window background and the
+/// quick-signal interval. At start, after a save from the page, and when widget.json was changed
+/// by someone else (signals.rs), so a pin set in the file by a person or an agent applies too.
+pub fn apply_settings(app: &AppHandle, s: &settings::WidgetSettings) {
+    crate::signals::set_interval(s.signal_secs);
+    if let Some(window) = main_window(app) {
+        let _ = window.set_always_on_top(s.window_on_top);
+        paint_background(&window, &s.theme);
+    }
+}
+
 /// Window background in the theme's color: what shows before the page paints and while resizing.
 pub fn paint_background(window: &WebviewWindow, theme: &str) {
     let dark = match theme {
