@@ -1,9 +1,12 @@
 import { beforeAll, describe, expect, it } from "vitest";
-import { setLang, t } from "./i18n";
+import { formatWhen, setLang, t } from "./i18n";
 import {
   cleanupRequest,
   fetchRange,
+  fullRepos,
   layoutCounts,
+  mergeGit,
+  mergeRepos,
   repoKey,
   sharedRepos,
   urgentItems,
@@ -11,7 +14,7 @@ import {
   warnings,
 } from "./model";
 import { defaultSettings } from "./settings";
-import type { Dashboard, GitState, Slot } from "./types";
+import type { Dashboard, GitState, RepoGit, Slot } from "./types";
 
 const NOW = new Date("2026-11-16T12:00:00+09:00");
 const settings = defaultSettings();
@@ -121,5 +124,84 @@ describe("what the banner shows", () => {
     const items = urgentItems(doc, settings, "timeout");
     expect(items.map((i) => (i.kind === "stalled" ? `stalled:${i.slot.name}` : i.kind))).toEqual(["error", "stalled:A", "stalled:B", "commit"]);
     expect(urgentItems(docOf([]), settings, null)).toEqual([]);
+  });
+});
+
+describe("git directories (core 0.7.0 repos)", () => {
+  beforeAll(() => setLang("en"));
+
+  const A = "C:/repo/MyGame/.git";
+  const B = "C:/repo/MyGame-1/.git";
+  const fullRepo = (commonDir: string, slotName: string, extra: Partial<RepoGit> = {}): RepoGit => ({
+    commonDir,
+    repo: "MyGame",
+    level: "full",
+    folders: [{ path: `C:/repo/${slotName}`, slot: slotName, main: true, branch: "master", head: "aaa", detached: false }],
+    branches: [{ name: "master", tip: "aaa", upstream: "origin/master", upstreamGone: false, ahead: 0, behind: 0, localOnly: { commits: 0, oldestAt: null } }],
+    stashes: [],
+    ...extra,
+  });
+
+  it("keeps basic folder fields over the last full git (head, detached, change kinds, git directory)", () => {
+    const full = git(A, { head: "old", detached: false, changesDetail: { staged: 1 }, gitDir: "x" });
+    const basic: GitState = { level: "basic", branch: "(detached)", head: "new", detached: true, changesDetail: { untracked: 2 }, gitDir: A, changes: 2 };
+    const merged = mergeGit(basic, full)!;
+    expect(merged).toMatchObject({ level: "full", branch: "(detached)", head: "new", detached: true, changesDetail: { untracked: 2 }, gitDir: A });
+    expect(merged.localOnly).toEqual(full.localOnly);
+  });
+
+  it("merges repos: the last full branches with the folders of a basic refresh", () => {
+    const last = fullRepo(A, "MyGame");
+    const basic: RepoGit = {
+      commonDir: "c:/repo/mygame/.git",
+      level: "basic",
+      folders: [{ path: "C:/repo/MyGame", slot: "MyGame", branch: "feature/new", head: "bbb" }],
+      branches: null,
+      stashes: null,
+    };
+    const merged = mergeRepos([basic, fullRepo(B, "MyGame-1", { level: "basic", branches: null })], fullRepos({ schema: "x", repos: [last] }))!;
+    expect(merged[0].branches).toEqual(last.branches);
+    expect(merged[0].folders![0].branch).toBe("feature/new");
+    expect(merged[1].branches).toBeNull();
+    expect(mergeRepos(undefined, new Map())).toBeNull();
+  });
+
+  it("warns per branch, once per tip, instead of once per repository", () => {
+    const lo = { commits: 7, oldestAt: "2026-10-01T09:00:00+09:00" };
+    const slots = [slot("MyGame", git(A, { localOnly: OLD })), slot("MyGame-1", git(B, { localOnly: OLD }))];
+    const repos = [
+      fullRepo(A, "MyGame", {
+        branches: [
+          { name: "backup/x", tip: "c9", upstream: null, localOnly: lo },
+          { name: "feature/new", tip: "d1", upstream: null, localOnly: { commits: 1, oldestAt: "2026-11-16T09:00:00+09:00" } },
+        ],
+      }),
+      fullRepo(B, "MyGame-1", { branches: [{ name: "backup/x", tip: "c9", upstream: null, localOnly: lo }] }),
+    ];
+    const list = warnings(docOf(slots), settings, NOW, gitOf, repos).filter((w) => w.text.includes("on no remote"));
+    expect(list).toHaveLength(1);
+    expect(list[0]).toMatchObject({ severity: "critical", slot: "MyGame", slots: ["MyGame", "MyGame-1"] });
+    expect(list[0].text).toContain("backup/x");
+    // Without branches for a git directory, its own count still warns
+    const half = warnings(docOf(slots), settings, NOW, gitOf, [repos[0], { ...repos[1], branches: null }]).filter((w) => w.text.includes("on no remote"));
+    expect(half.map((w) => w.slot)).toEqual(["MyGame-1", "MyGame"]);
+  });
+
+  it("names the branches behind a repository's numbers in the cleanup request", () => {
+    const slots = [slot("MyGame", git(A, { localOnly: OLD }))];
+    const repos = [
+      fullRepo(A, "MyGame", {
+        branches: [
+          { name: "master", tip: "aaa", upstream: "origin/master", ahead: 2, localOnly: { commits: 0 } },
+          { name: "feature/old", tip: "bbb", upstream: "origin/feature/old", upstreamGone: true, localOnly: OLD },
+          { name: "feature/clean", tip: "ccc", upstream: "origin/feature/clean", ahead: 0, localOnly: { commits: 0 } },
+        ],
+      }),
+    ];
+    const text = cleanupRequest(docOf(slots), NOW, gitOf, {}, repos)!;
+    expect(text).toContain(`  - master: ${t("git.ahead", { n: 2 })}`);
+    expect(text).toContain(`  - feature/old: ${t("git.localOnlySince", { n: 7, date: formatWhen(OLD.oldestAt, NOW) })} · ${t("cleanup.branchGone")}`);
+    expect(text).not.toContain("feature/clean");
+    expect(text).toContain(t("cleanup.branchNote"));
   });
 });

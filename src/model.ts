@@ -6,7 +6,7 @@
  * counted once. It also orders what needs a person now (the banner; glance.ts uses the same rules
  * for the tray tooltip and the taskbar badge).
  */
-import type { Dashboard, GitState, Slot, WidgetSettings } from "./types";
+import type { Dashboard, GitState, RepoGit, Slot, WidgetSettings } from "./types";
 import { formatDuration, formatWhen, t } from "./i18n";
 
 export type Severity = "critical" | "warn" | "info";
@@ -70,7 +70,21 @@ export function mergeGit(basic: GitState | null | undefined, full: GitState | un
   if (!full || basic?.level === "full") return basic ?? null;
   if (!basic) return full;
   const merged: GitState = { ...full };
-  for (const key of ["branch", "upstream", "upstreamGone", "changes", "ahead", "behind", "lastFetchAt", "error"] as const) {
+  // Everything a basic answer carries; a key left out here would keep the last full value
+  for (const key of [
+    "branch",
+    "upstream",
+    "upstreamGone",
+    "changes",
+    "ahead",
+    "behind",
+    "lastFetchAt",
+    "error",
+    "head",
+    "detached",
+    "changesDetail",
+    "gitDir",
+  ] as const) {
     if (basic[key] !== undefined) (merged as Record<string, unknown>)[key] = basic[key];
   }
   merged.level = "full";
@@ -162,9 +176,125 @@ export function layoutCounts(slots: readonly Slot[], gitOf: GitOf): { clones: nu
   return { clones: slots.length - worktrees, worktrees };
 }
 
+// ---------------------------------------------------------------- git directories (core 0.7.0 repos[])
+
+/** Whole days since `iso`, or null. */
+export function daysSince(iso: string | null | undefined, now: Date): number | null {
+  const ms = elapsedSince(iso, now);
+  return ms === null ? null : Math.floor(ms / DAY);
+}
+
+/**
+ * `repos[]` with the last full answer kept per git directory: a basic refresh brings only who has
+ * which branch checked out (`folders`), and branches, stashes and commits on no remote stay those
+ * of the last full answer. Null when the core has no `repos` (before 0.7.0, or the summary).
+ */
+export function mergeRepos(basic: readonly RepoGit[] | null | undefined, full: ReadonlyMap<string, RepoGit>): RepoGit[] | null {
+  if (!Array.isArray(basic)) return null;
+  return basic.map((r) => {
+    if (r.level === "full" || !r.commonDir) return r;
+    const last = full.get(repoKey(r.commonDir));
+    return last ? { ...last, folders: r.folders ?? last.folders } : r;
+  });
+}
+
+/** The full answers of a document by repoKey (main.ts keeps them for mergeRepos). */
+export function fullRepos(doc: Dashboard): Map<string, RepoGit> {
+  const map = new Map<string, RepoGit>();
+  for (const r of doc.repos ?? []) if (r.commonDir && r.level === "full") map.set(repoKey(r.commonDir), r);
+  return map;
+}
+
+/** The slots that use a git directory: its registered folders and the slots whose commonDir it is. */
+export function repoSlots(repo: RepoGit, slots: readonly Slot[], gitOf: GitOf): Slot[] {
+  const key = repoKey(repo.commonDir);
+  const names = new Set((repo.folders ?? []).map((f) => f.slot).filter((n): n is string => !!n));
+  return slots.filter((s) => names.has(s.name) || slotRepoKey(s, gitOf) === key);
+}
+
+/** The list group (project) a git directory belongs to: its first slot's, else the core's repo name. */
+export function repoGroupName(repo: RepoGit, members: readonly Slot[]): string {
+  return members.length ? groupName(members[0]) : repo.repo || repo.project || "-";
+}
+
+/** The git directory of a slot in `repos`, if the core reported one. */
+export function repoOfSlot(slot: Slot, repos: readonly RepoGit[] | null | undefined, gitOf: GitOf): RepoGit | null {
+  if (!repos) return null;
+  const key = slotRepoKey(slot, gitOf);
+  return (
+    repos.find((r) => (key && repoKey(r.commonDir) === key) || (r.folders ?? []).some((f) => f.slot === slot.name)) ?? null
+  );
+}
+
+/** The name a detached working folder goes by in lists and warnings. */
+export function detachedName(folder: { slot?: string | null; path: string }): string {
+  return t("branch.detachedName", { slot: folder.slot || folder.path });
+}
+
+interface LocalOnlyHit {
+  project: string;
+  names: string[];
+  slots: string[];
+  n: number;
+  days: number;
+}
+
+/**
+ * Commits on no remote, per branch (full answers only): one entry per project and branch tip, so a
+ * branch several clones have at the same tip is one warning. `covered` holds the git directories
+ * that had branches; for the others the repository's own count applies (older cores, no full yet).
+ */
+function branchLocalOnly(
+  repos: readonly RepoGit[] | null | undefined,
+  slots: readonly Slot[],
+  gitOf: GitOf,
+  settings: Pick<WidgetSettings, "localOnlyWarnDays">,
+  now: Date,
+): { hits: LocalOnlyHit[]; covered: Set<string> } {
+  const byTip = new Map<string, LocalOnlyHit>();
+  const covered = new Set<string>();
+  for (const repo of repos ?? []) {
+    if (!repo.commonDir || !Array.isArray(repo.branches)) continue;
+    covered.add(repoKey(repo.commonDir));
+    const members = repoSlots(repo, slots, gitOf);
+    const project = repoGroupName(repo, members);
+    const holders = members.map((s) => s.name);
+    const candidates = [
+      ...repo.branches.map((b) => ({ name: b.name, tip: b.tip ?? null, lo: b.localOnly })),
+      ...(repo.folders ?? []).filter((f) => f.detached).map((f) => ({ name: detachedName(f), tip: f.head ?? null, lo: f.localOnly })),
+    ];
+    for (const c of candidates) {
+      const n = c.lo?.commits ?? 0;
+      const days = n > 0 ? daysSince(c.lo?.oldestAt, now) : null;
+      if (days === null || days < settings.localOnlyWarnDays) continue;
+      const key = `${project}\u0000${c.tip ?? `${repoKey(repo.commonDir)}\u0000${c.name}`}`;
+      const hit = byTip.get(key);
+      if (!hit) {
+        byTip.set(key, { project, names: [c.name], slots: [...holders], n, days });
+        continue;
+      }
+      if (!hit.names.includes(c.name)) hit.names.push(c.name);
+      for (const h of holders) if (!hit.slots.includes(h)) hit.slots.push(h);
+      hit.n = Math.max(hit.n, n);
+      hit.days = Math.max(hit.days, days);
+    }
+  }
+  return { hits: [...byTip.values()].sort((a, b) => b.days - a.days), covered };
+}
+
 // ---------------------------------------------------------------- warnings
 
-export function warnings(doc: Dashboard, settings: WidgetSettings, now: Date, gitOf: GitOf): Warning[] {
+/**
+ * What the warnings panel lists. With `repos` (core 0.7.0, merged by mergeRepos) commits on no
+ * remote are warned per branch, once per branch tip; else per repository as before.
+ */
+export function warnings(
+  doc: Dashboard,
+  settings: WidgetSettings,
+  now: Date,
+  gitOf: GitOf,
+  repos: readonly RepoGit[] | null = null,
+): Warning[] {
   const list: Warning[] = [];
   const percent = doc.system?.commit?.percent;
   if (typeof percent === "number") {
@@ -186,6 +316,7 @@ export function warnings(doc: Dashboard, settings: WidgetSettings, now: Date, gi
   const slots = doc.slots ?? [];
   const shared = sharedRepos(slots, gitOf);
   const counted = new Set<string>();
+  const perBranch = branchLocalOnly(repos, slots, gitOf, settings, now);
   for (const slot of slots) {
     const editor = slot.editor;
     const gb = editor?.memory?.totalPrivGB;
@@ -206,8 +337,9 @@ export function warnings(doc: Dashboard, settings: WidgetSettings, now: Date, gi
     if (typeof gb === "number" && gb >= settings.slotMemoryWarnGb && !(slot.flags ?? []).includes("open-without-lease")) {
       list.push({ severity: "warn", slot: slot.name, text: t("flag.memory-high", { slot: slot.name, gb: gb.toFixed(1) }) });
     }
-    // Commits on no remote belong to the repository: once for slots that share one
+    // Commits on no remote belong to the repository: once for slots that share one, per branch below
     const repo = slotRepoKey(slot, gitOf);
+    if (repo && perBranch.covered.has(repo)) continue;
     const members = repo ? shared.get(repo) : undefined;
     if (repo && members) {
       if (counted.has(repo)) continue;
@@ -224,6 +356,14 @@ export function warnings(doc: Dashboard, settings: WidgetSettings, now: Date, gi
         text: t("flag.local-only-old", { slot: names.join(", "), n: git?.localOnly?.commits ?? 0, days }),
       });
     }
+  }
+  for (const hit of perBranch.hits) {
+    list.push({
+      severity: hit.days >= settings.localOnlyCriticalDays ? "critical" : "warn",
+      ...(hit.slots.length ? { slot: hit.slots[0] } : {}),
+      ...(hit.slots.length > 1 ? { slots: hit.slots } : {}),
+      text: t("flag.branch-local-only-old", { branch: hit.names.join(", "), slot: hit.slots.join(", ") || hit.project, n: hit.n, days: hit.days }),
+    });
   }
   const rank: Record<Severity, number> = { critical: 0, warn: 1, info: 2 };
   return list.sort((a, b) => rank[a.severity] - rank[b.severity]);
@@ -308,6 +448,26 @@ function folderParts(slot: Slot, git: GitState | null): string[] {
   return parts;
 }
 
+/**
+ * Branches of a git directory worth naming in a cleanup request (full answers only): commits on no
+ * remote, commits not pushed to its upstream, a gone upstream; then a detached folder's own commits.
+ */
+export function branchCleanupLines(repo: RepoGit | null | undefined, now: Date): string[] {
+  if (!repo || !Array.isArray(repo.branches)) return [];
+  const out: string[] = [];
+  const add = (name: string, lo: GitState["localOnly"], ahead: number, gone: boolean) => {
+    const parts: string[] = [];
+    const local = localOnlyText({ localOnly: lo }, now);
+    if (local) parts.push(local);
+    if (ahead > 0) parts.push(t("git.ahead", { n: ahead }));
+    if (gone) parts.push(t("cleanup.branchGone"));
+    if (parts.length) out.push(`${name}: ${parts.join(" · ")}`);
+  };
+  for (const b of repo.branches) add(b.name, b.localOnly, b.upstream && !b.upstreamGone ? (b.ahead ?? 0) : 0, b.upstreamGone === true);
+  for (const f of repo.folders ?? []) if (f.detached) add(detachedName(f), f.localOnly, 0, false);
+  return out;
+}
+
 export interface CleanupScope {
   /** Only these slots (a project, one slot); all slots when left out. */
   slots?: ReadonlySet<string> | null;
@@ -317,14 +477,27 @@ export interface CleanupScope {
 
 /**
  * Markdown checklist an agent session can work through, asking before each change. A repository
- * that several slots share gets one line for its own numbers, then a line per folder.
+ * that several slots share gets one line for its own numbers, then a line per folder. With `repos`
+ * (core 0.7.0) the branches behind the numbers are listed under the repository's line.
  */
-export function cleanupRequest(doc: Dashboard, now: Date, gitOf: GitOf, scope: CleanupScope = {}): string | null {
+export function cleanupRequest(
+  doc: Dashboard,
+  now: Date,
+  gitOf: GitOf,
+  scope: CleanupScope = {},
+  repos: readonly RepoGit[] | null = null,
+): string | null {
   const all = doc.slots ?? [];
   const slots = scope.slots ? all.filter((s) => scope.slots!.has(s.name)) : all;
   const shared = sharedRepos(all, gitOf);
   const lines: string[] = [];
   const repoDone = new Set<string>();
+  let named = false;
+  const branchLines = (slot: Slot): string[] => {
+    const sub = branchCleanupLines(repoOfSlot(slot, repos, gitOf), now);
+    if (sub.length) named = true;
+    return sub.map((l) => `  - ${l}`);
+  };
   for (const slot of slots) {
     const git = gitOf(slot);
     const repo = slotRepoKey(slot, gitOf);
@@ -333,9 +506,13 @@ export function cleanupRequest(doc: Dashboard, now: Date, gitOf: GitOf, scope: C
       if (!repoDone.has(repo)) {
         repoDone.add(repo);
         const parts = repoParts(git, now);
-        if (parts.length) {
+        const sub = branchLines(slot);
+        if (parts.length || sub.length) {
           lines.push(
-            `- [ ] ${t("cleanup.repoLine", { dir: git?.commonDir ?? repo, slots: members.map((s) => s.name).join(", ") })}: ${parts.join(" · ")}`,
+            `- [ ] ${t("cleanup.repoLine", { dir: git?.commonDir ?? repo, slots: members.map((s) => s.name).join(", ") })}: ${
+              parts.length ? parts.join(" · ") : t("cleanup.seeBranches")
+            }`,
+            ...sub,
           );
         }
       }
@@ -344,12 +521,14 @@ export function cleanupRequest(doc: Dashboard, now: Date, gitOf: GitOf, scope: C
       continue;
     }
     const parts = [...repoParts(git, now), ...folderParts(slot, git)];
-    if (parts.length) lines.push(`- [ ] ${slot.name} (${slot.path}): ${parts.join(" · ")}`);
+    const sub = branchLines(slot);
+    if (parts.length || sub.length) lines.push(`- [ ] ${slot.name} (${slot.path}): ${parts.length ? parts.join(" · ") : t("cleanup.seeBranches")}`, ...sub);
   }
   if (!lines.length) return null;
   const time = formatWhen(doc.time, now);
   const title = scope.label ? t("cleanup.titleScoped", { scope: scope.label, time }) : t("cleanup.title", { time });
   const notes = [t("cleanup.fetchNote")];
+  if (named) notes.push(t("cleanup.branchNote"));
   if (repoDone.size) notes.push(t("cleanup.worktreeNote"));
   notes.push(t("cleanup.request"));
   return [title, "", ...lines, "", ...notes, ""].join("\n");

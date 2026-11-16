@@ -39,6 +39,7 @@
   "flag.batch-running": "{slot} batch 실행 중",
   "flag.missing-path": "{slot} 경로 없음",
   "flag.local-only-old": "{slot} 원격에 없는 커밋 {n} ({days}일째)",
+  "flag.branch-local-only-old": "{branch} 원격에 없는 커밋 {n} ({days}일째 · {slot})",
   "flag.lease-client-gone": "{slot} 임대를 잡은 에이전트 프로그램이 끝남 (주인 없는 임대)",
   "flag.memory-high": "{slot} 메모리 {gb}GB",
   "flag.other": "{slot} {flag}",
@@ -162,6 +163,10 @@
   "cleanup.repoLine": "저장소 {dir} (같이 쓰는 슬롯: {slots})",
   "cleanup.worktreeNote": "여러 슬롯이 같이 쓰는 저장소는 worktree remove·prune을 하지 말고, stash는 apply만 쓰고, 다른 폴더가 체크아웃한 브랜치는 건드리지 마.",
   "cleanup.fetchNote": "git 값은 마지막 fetch 기준입니다.",
+  "cleanup.branchGone": "upstream 사라짐",
+  "cleanup.seeBranches": "아래 브랜치",
+  "cleanup.branchNote": "브랜치 이름은 마지막 자세한 git 조회 기준입니다. 클론마다 같은 이름 브랜치가 따로 있을 수 있어요.",
+  "branch.detachedName": "분리 HEAD ({slot})",
   "cleanup.request": "요청: 항목마다 무엇을 할지(푸시·PR·브랜치 정리·에디터 닫기·그대로 둠) 먼저 묻고, 승인한 것만 처리해 줘. 에디터는 unity-slot으로만 열고 닫아 줘.",
 
   "tray.show": "창 보이기",

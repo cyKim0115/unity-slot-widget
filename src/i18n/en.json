@@ -39,6 +39,7 @@
   "flag.batch-running": "{slot} batch run in progress",
   "flag.missing-path": "{slot} path missing",
   "flag.local-only-old": "{slot} {n} commit(s) on no remote ({days} days)",
+  "flag.branch-local-only-old": "{branch}: {n} commit(s) on no remote ({days} days · {slot})",
   "flag.lease-client-gone": "{slot} lease holder has exited (orphaned lease)",
   "flag.memory-high": "{slot} uses {gb} GB",
   "flag.other": "{slot} {flag}",
@@ -162,6 +163,10 @@
   "cleanup.repoLine": "Repository {dir} (shared by {slots})",
   "cleanup.worktreeNote": "In a repository several slots share, do not run worktree remove or prune, use stash apply only, and leave branches another folder has checked out alone.",
   "cleanup.fetchNote": "git values are as of the last fetch.",
+  "cleanup.branchGone": "upstream gone",
+  "cleanup.seeBranches": "branches below",
+  "cleanup.branchNote": "Branch names are as of the last detailed git check. Each clone may have its own branch of the same name.",
+  "branch.detachedName": "detached HEAD ({slot})",
   "cleanup.request": "Request: for each item, ask me first what to do (push, PR, clean up branches, close the editor, or leave it), and do only what I approve. Open and close editors only through unity-slot.",
 
   "tray.show": "Show window",
