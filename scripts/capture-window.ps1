@@ -1,11 +1,17 @@
 # Saves a PNG of one app window only (PrintWindow, PW_RENDERFULLCONTENT), for README screenshots.
 # Other windows and the desktop are not captured. The window must not be minimized.
 #   powershell -NoProfile -File scripts\capture-window.ps1 -Out docs\assets\widget.png [-Title "Unity Slot Widget"]
+# The installed app and a `tauri dev` run have the same process name and window title. To capture
+# one of them only, give its process id (-ProcessId, alias -Pid) or its exe (-ExePath), e.g.
+#   -ExePath src-tauri\target\debug\unity-slot-widget.exe
 # ASCII only (Windows PowerShell 5.1).
 param(
   [Parameter(Mandatory = $true)][string]$Out,
   [string]$ProcessName = "unity-slot-widget",
-  [string]$Title = "Unity Slot Widget"
+  [string]$Title = "Unity Slot Widget",
+  # Not $Pid: that name is PowerShell's own read-only variable
+  [Alias("Pid")][int]$ProcessId = 0,
+  [string]$ExePath = ""
 )
 $ErrorActionPreference = "Stop"
 Add-Type -AssemblyName System.Drawing
@@ -38,9 +44,17 @@ public static class Win {
 }
 "@
 [void][Win]::SetProcessDPIAware()
-$pids = @(Get-Process -Name $ProcessName -ErrorAction Stop | ForEach-Object { [uint32]$_.Id })
+$procs = @(Get-Process -Name $ProcessName -ErrorAction Stop)
+if ($ProcessId -gt 0) { $procs = @($procs | Where-Object { $_.Id -eq $ProcessId }) }
+if ($ExePath) {
+  $want = [IO.Path]::GetFullPath($ExePath)
+  $procs = @($procs | Where-Object { $_.Path -and ([IO.Path]::GetFullPath($_.Path) -ieq $want) })
+}
+if ($procs.Count -eq 0) { throw "No $ProcessName process matches -ProcessId $ProcessId -ExePath '$ExePath'." }
+$pids = @($procs | ForEach-Object { [uint32]$_.Id })
 $handles = [Win]::Find($pids, $Title)
-if ($handles.Count -eq 0) { throw "No visible window titled '$Title' for $ProcessName." }
+if ($handles.Count -eq 0) { throw "No visible window titled '$Title' for $ProcessName (pid $($pids -join ', '))." }
+if ($handles.Count -gt 1) { Write-Warning "$($handles.Count) windows match; capturing the first. Use -ProcessId or -ExePath to pick one." }
 $h = $handles[0]
 $r = New-Object Win+RECT
 [void][Win]::GetWindowRect($h, [ref]$r)
