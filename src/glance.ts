@@ -2,11 +2,12 @@
  * The state at a glance while the window is out of sight (minimized, behind other windows, hidden
  * to the tray): one status line for the tray tooltip, a level for the taskbar badge, and the risks
  * that flash the taskbar button when they are new (a stalled start, critical commit charge).
- * Rust draws and sets them (src-tauri/src/overlay.rs, `set_glance`).
+ * Rust draws and sets them (src-tauri/src/overlay.rs, `set_glance`). A stalled start and a critical
+ * commit charge are decided by the same rules as the banner (model.ts `urgentItems`).
  */
 
 import { t } from "./i18n";
-import { isOpen, type Warning } from "./model";
+import { commitCritical, isOpen, stalledSlots, type Warning } from "./model";
 import type { Dashboard, WidgetSettings } from "./types";
 
 /** critical: red badge, warn: amber, ok: green, none: no badge (nothing known yet). */
@@ -42,20 +43,20 @@ export function glance({ doc, warnings, settings, error, paused }: GlanceInput):
     const open = doc.system?.editorsOpen ?? slots.filter(isOpen).length;
     const max = doc.registry?.maxEditors ?? slots.length;
     parts.push(t("status.editors", { open, max }));
-    const stalled = slots.filter((s) => s.editor?.state === "stalled");
+    const stalled = stalledSlots(doc);
     if (stalled.length) parts.push(t("tray.stalled", { n: stalled.length }));
     const percent = doc.system?.commit?.percent;
     const commitWarn = typeof percent === "number" && percent >= settings.commitWarnPercent;
-    const commitCritical = typeof percent === "number" && percent >= settings.commitCriticalPercent;
+    const critical = commitCritical(doc, settings) !== null;
     if (commitWarn) parts.push(t("header.commit", { percent: percent! }));
     const counted = (warnings ?? []).filter((w) => w.severity !== "info");
     if (counted.length) parts.push(t("status.warnings", { n: counted.length }));
 
     level = "ok";
     if (counted.length || commitWarn) level = "warn";
-    if (stalled.length || commitCritical || counted.some((w) => w.severity === "critical")) level = "critical";
+    if (stalled.length || critical || counted.some((w) => w.severity === "critical")) level = "critical";
     for (const s of stalled) risks.push(`stalled:${s.name}`);
-    if (commitCritical) risks.push("commit-critical");
+    if (critical) risks.push("commit-critical");
   } else if (!error) {
     parts.push(t("footer.loading"));
   }
