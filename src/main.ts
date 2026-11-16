@@ -1027,6 +1027,14 @@ function applyPreviewQuery() {
   }
 }
 
+/** After the next paint. A window that is still hidden may get no animation frame: a timer ends the wait too. */
+function afterPaint(): Promise<void> {
+  return new Promise((resolve) => {
+    requestAnimationFrame(() => setTimeout(resolve, 0));
+    setTimeout(resolve, 100);
+  });
+}
+
 async function boot() {
   if (!inTauri) applyPreviewQuery();
   app.dataset.body = bodyOpen ? "open" : "hidden";
@@ -1045,6 +1053,9 @@ async function boot() {
   render();
   // The saved widths and open states paint without animation; then panels animate
   requestAnimationFrame(() => requestAnimationFrame(() => app.classList.remove("no-anim")));
+  // The window starts hidden; it shows once this first paint is ready (no white page flashes)
+  await afterPaint();
+  await call("window_ready").catch(() => {});
 
   await on("slot-signal", onSignal);
   await on("widget-shown", () => void refresh(false));

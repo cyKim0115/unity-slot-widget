@@ -1,3 +1,4 @@
+mod appwindow;
 mod core;
 mod install;
 mod open;
@@ -6,11 +7,10 @@ mod settings;
 mod signals;
 mod tray;
 
+use appwindow::MAIN_LABEL;
 use settings::WidgetSettings;
-use tauri::Manager;
+use tauri::{Manager, WindowEvent};
 use tauri_plugin_window_state::StateFlags;
-
-const MAIN_LABEL: &str = "main";
 
 #[tauri::command]
 fn get_settings() -> WidgetSettings {
@@ -18,7 +18,7 @@ fn get_settings() -> WidgetSettings {
 }
 
 /// Stores only the keys in `patch` (merged into widget.json, which others edit too) and returns the
-/// settings now in effect. The window pin and the signal interval follow at once.
+/// settings now in effect. The window pin, the background color and the signal interval follow at once.
 #[tauri::command]
 fn update_settings(app: tauri::AppHandle, patch: serde_json::Map<String, serde_json::Value>) -> Result<WidgetSettings, String> {
     let saved = settings::update(&patch)?;
@@ -30,7 +30,15 @@ fn apply_saved(app: &tauri::AppHandle, saved: &WidgetSettings) {
     signals::set_interval(saved.signal_secs);
     if let Some(window) = app.get_webview_window(MAIN_LABEL) {
         let _ = window.set_always_on_top(saved.window_on_top);
+        appwindow::paint_background(&window, &saved.theme);
     }
+}
+
+/// The page has painted once: show the window (minimized when Windows started it and the
+/// setting says so). Later calls (a page reload) do nothing.
+#[tauri::command]
+fn window_ready(app: tauri::AppHandle) {
+    appwindow::show_first(&app);
 }
 
 /// What the settings About tab shows.
@@ -125,35 +133,22 @@ fn is_autostart_enabled() -> Result<bool, String> {
     install::is_enabled()
 }
 
-/// The page measures its content and asks for that height (CSS px).
-#[tauri::command]
-fn resize_main_window(app: tauri::AppHandle, height: f64) -> Result<(), String> {
-    let window = app
-        .get_webview_window(MAIN_LABEL)
-        .ok_or_else(|| "main window not found".to_string())?;
-    let scale = window.scale_factor().map_err(|e| e.to_string())?;
-    let outer = window.outer_size().map_err(|e| e.to_string())?;
-    let inner = window.inner_size().map_err(|e| e.to_string())?;
-    // A resizable window without decorations still has a thin frame outside the page.
-    let frame = outer.height.saturating_sub(inner.height);
-    let height = (height.clamp(140.0, 900.0) * scale).round() as u32 + frame;
-    if outer.height != height {
-        window
-            .set_size(tauri::Size::Physical(tauri::PhysicalSize { width: outer.width, height }))
-            .map_err(|e| e.to_string())?;
-    }
-    Ok(())
-}
-
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    tauri::Builder::default()
-        // Position only: the page sets the height from its content on every refresh.
+    let builder = tauri::Builder::default();
+    // A second start shows the running window instead. Release builds only: the lock is the app
+    // identifier, so an installed copy that is running would quietly end `tauri dev`.
+    #[cfg(not(debug_assertions))]
+    let builder = builder.plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| tray::show_widget(app)));
+    builder
+        // Position, size and maximized state, in a file of its own (see appwindow.rs)
         .plugin(
             tauri_plugin_window_state::Builder::default()
-                .with_state_flags(StateFlags::POSITION)
+                .with_filename(appwindow::STATE_FILE)
+                .with_state_flags(StateFlags::POSITION | StateFlags::SIZE | StateFlags::MAXIMIZED)
                 .build(),
         )
+        .manage(appwindow::Startup::from_args())
         .invoke_handler(tauri::generate_handler![
             get_settings,
             update_settings,
@@ -170,18 +165,44 @@ pub fn run() {
             enable_autostart,
             disable_autostart,
             is_autostart_enabled,
-            resize_main_window
+            window_ready
         ])
         .setup(|app| {
             tray::install(app)?;
             install::cleanup_debug_entry();
             let s = settings::load();
             if let Some(window) = app.get_webview_window(MAIN_LABEL) {
+                appwindow::import_old_position(app.handle(), &window);
+                appwindow::paint_background(&window, &s.theme);
                 let _ = window.set_always_on_top(s.window_on_top);
             }
             signals::set_interval(s.signal_secs);
             signals::start(app.handle().clone());
+            // The page normally asks for the first show; if it never does, show the window anyway
+            let handle = app.handle().clone();
+            std::thread::spawn(move || {
+                std::thread::sleep(std::time::Duration::from_secs(5));
+                appwindow::show_first(&handle);
+            });
             Ok(())
+        })
+        .on_window_event(|window, event| {
+            if window.label() != MAIN_LABEL {
+                return;
+            }
+            match event {
+                // The close box quits, or hides to the tray when the setting says so
+                WindowEvent::CloseRequested { api, .. } if settings::load().close_action == "tray" => {
+                    api.prevent_close();
+                    let _ = window.hide();
+                }
+                WindowEvent::ThemeChanged(_) => {
+                    if let Some(window) = window.app_handle().get_webview_window(MAIN_LABEL) {
+                        appwindow::paint_background(&window, &settings::load().theme);
+                    }
+                }
+                _ => {}
+            }
         })
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

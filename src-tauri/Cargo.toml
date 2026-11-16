@@ -19,6 +19,8 @@ serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 auto-launch = "0.5"
 tauri-plugin-window-state = "2"
+# Release builds: a second start shows the running window (lib.rs)
+tauri-plugin-single-instance = "2.5.0"
 winreg = "0.55"
 # Same windows version as tauri (0.61).
 # signals.rs: ToolHelp process list. open.rs: ShellExecuteW, window lookup.

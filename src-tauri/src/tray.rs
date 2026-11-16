@@ -1,7 +1,8 @@
 //! Notification-area icon.
 //!
-//! The tray is where a window hidden to the tray comes back. Left click shows or hides it; right
-//! click opens the menu (show the window, settings, quit). The page sends the menu labels in its
+//! The tray is where a window hidden to the tray comes back. Left click shows the window when it
+//! is hidden or minimized and hides it otherwise; right click opens the menu (show the window,
+//! settings, quit). The page sends the menu labels in its
 //! language (`set_tray_labels`); until then they are English.
 
 use tauri::{
@@ -92,27 +93,29 @@ fn on_tray_icon_event(tray: &TrayIcon, event: TrayIconEvent) {
     } = event
     {
         let app = tray.app_handle();
-        let visible = app
-            .get_webview_window(MAIN_LABEL)
-            .and_then(|window| window.is_visible().ok())
-            .unwrap_or(false);
-        if visible {
-            hide_widget(app);
-        } else {
+        let Some(window) = app.get_webview_window(MAIN_LABEL) else {
+            return;
+        };
+        // A minimized window still counts as visible (IsWindowVisible): bring it back too
+        let visible = window.is_visible().unwrap_or(false);
+        let minimized = window.is_minimized().unwrap_or(false);
+        if !visible || minimized {
             show_widget(app);
+        } else {
+            hide_widget(app);
         }
     }
 }
 
+/// Shows the window (also from a second start of the app): visible, restored, in front.
 pub fn show_widget(app: &AppHandle) {
     let Some(window) = app.get_webview_window(MAIN_LABEL) else {
         return;
     };
+    crate::appwindow::mark_shown(app);
     let _ = window.show();
     let _ = window.unminimize();
     let _ = window.set_focus();
-    // tao clears the taskbar button only when it creates the window; clear it again.
-    let _ = window.set_skip_taskbar(true);
 }
 
 fn hide_widget(app: &AppHandle) {

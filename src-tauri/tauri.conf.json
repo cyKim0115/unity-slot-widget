@@ -15,14 +15,14 @@
       {
         "label": "main",
         "title": "Unity Slot Widget",
-        "width": 400,
-        "height": 320,
-        "minWidth": 320,
-        "minHeight": 140,
+        "width": 1200,
+        "height": 760,
+        "minWidth": 400,
+        "minHeight": 300,
         "resizable": true,
         "decorations": false,
-        "alwaysOnTop": true,
-        "skipTaskbar": true
+        "visible": false,
+        "center": true
       }
     ],
     "security": {
@@ -33,8 +33,8 @@
     "active": true,
     "targets": ["nsis"],
     "license": "../LICENSE",
-    "shortDescription": "Live view of unity-slot slots",
-    "longDescription": "A small always-visible desktop widget that shows the slots registered with unity-slot: which Unity editors are open, starting or closed, who holds a lease, how much memory each editor tree uses, and local-only git state.",
+    "shortDescription": "Desktop app for unity-slot slots",
+    "longDescription": "A desktop app that shows the slots registered with unity-slot: which Unity editors are open, starting or closed, who holds a lease, how much memory each editor tree uses, and local-only git state. The tray tooltip and the taskbar icon show the worst state while the window is out of sight.",
     "windows": {
       "nsis": {
         "installMode": "currentUser",
