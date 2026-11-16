@@ -75,6 +75,7 @@ import { projectsPanel } from "./panels/projects";
 import { warningsPanel } from "./panels/warnings";
 import {
   bBranchKey,
+  bProjectKey,
   bRepoKey,
   branchBody,
   branchesTabLabel,
@@ -1085,6 +1086,8 @@ function showSlotBranches(slot: Slot) {
   const hit = branch && pb?.groups.some((g) => g.name === branch);
   branchSelected = hit ? bBranchKey(name, branch!) : bRepoKey(name);
   writePref("branchSelected", branchSelected);
+  // The selection sits under the project head: a folded one opens
+  if (branchCollapsed.delete(bProjectKey(name))) writePref("branchCollapsed", [...branchCollapsed]);
   const g = hit ? pb!.groups.find((x) => x.name === branch) : null;
   // A clean branch is hidden by the 「주의」 filter: show every branch for now (the saved filter stays)
   if (g && g.level === "clean" && branchFilter === "attention") {
@@ -1706,7 +1709,12 @@ function onActionClick(e: MouseEvent): boolean {
   const target = e.target as HTMLElement;
   const pick = target.closest<HTMLElement>("[data-pick], [data-pick-item]");
   if (pick) {
-    reveal(pick.dataset.pickItem ?? slotKey(pick.dataset.pick!));
+    const key = pick.dataset.pickItem ?? slotKey(pick.dataset.pick!);
+    // A row of the branch screen's changes or stash head stays on the branch screen
+    if (isBranchKey(key)) {
+      if (view === "branches") select(key, { reveal: true });
+      else revealBranch(key);
+    } else reveal(key);
     return true;
   }
   const act = target.closest<HTMLElement>("[data-act]");
