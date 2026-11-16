@@ -6,7 +6,7 @@
  * counted once. It also orders what needs a person now (the banner; glance.ts uses the same rules
  * for the tray tooltip and the taskbar badge).
  */
-import type { Dashboard, GitState, RepoGit, Slot, WidgetSettings } from "./types";
+import type { Dashboard, GitState, RepoFolder, RepoGit, Slot, WidgetSettings } from "./types";
 import { formatDuration, formatWhen, t } from "./i18n";
 
 export type Severity = "critical" | "warn" | "info";
@@ -187,16 +187,35 @@ export function daysSince(iso: string | null | undefined, now: Date): number | n
 }
 
 /**
- * `repos[]` with the last full answer kept per git directory: a basic refresh brings only who has
- * which branch checked out (`folders`), and branches, stashes and commits on no remote stay those
- * of the last full answer. Null when the core has no `repos` (before 0.7.0, or the summary).
+ * `repos[]` with the last full answer kept per git directory: a basic refresh brings who has which
+ * branch checked out (`folders`) and the fields every level has (layout, last fetch, error); the
+ * full-only ones (branches, stashes, commits on no remote, flags) stay those of the last full
+ * answer. A detached folder's own commits on no remote are full-only too: they are kept while the
+ * folder is still at the same commit. Null when the core has no `repos` (before 0.7.0, the summary).
  */
 export function mergeRepos(basic: readonly RepoGit[] | null | undefined, full: ReadonlyMap<string, RepoGit>): RepoGit[] | null {
   if (!Array.isArray(basic)) return null;
-  return basic.map((r) => {
+  return basic.map((r: RepoGit): RepoGit => {
     if (r.level === "full" || !r.commonDir) return r;
     const last = full.get(repoKey(r.commonDir));
-    return last ? { ...last, folders: r.folders ?? last.folders } : r;
+    if (!last) return r;
+    const lastFolders = new Map((last.folders ?? []).map((f) => [repoKey(f.path), f]));
+    const folders = (r.folders ?? last.folders)?.map((f: RepoFolder): RepoFolder => {
+      if (f.localOnly != null || !f.detached) return f;
+      const old = lastFolders.get(repoKey(f.path));
+      return old?.localOnly && old.detached && !!old.head && old.head === f.head ? { ...f, localOnly: old.localOnly } : f;
+    });
+    return {
+      ...r,
+      level: last.level,
+      folders,
+      branches: last.branches,
+      stashes: last.stashes,
+      localOnly: last.localOnly,
+      flags: last.flags,
+      // A failed basic answer says more about now; else what went wrong in the full answer the branches come from
+      error: r.error ?? last.error ?? null,
+    };
   });
 }
 

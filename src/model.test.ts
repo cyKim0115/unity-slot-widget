@@ -166,6 +166,34 @@ describe("git directories (core 0.7.0 repos)", () => {
     expect(mergeRepos(undefined, new Map())).toBeNull();
   });
 
+  it("takes the fields a basic refresh has from it, and keeps a detached folder's own commits while it stays put", () => {
+    const lo = { commits: 2, oldestAt: "2026-11-15T09:00:00+09:00" };
+    const last = fullRepo(A, "MyGame", {
+      lastFetchAt: "2026-11-10T09:00:00+09:00",
+      folders: [{ path: "C:/repo/MyGame", slot: "MyGame", main: true, branch: null, head: "d1", detached: true, localOnly: lo }],
+      localOnly: lo,
+      flags: ["detached-local-only"],
+    });
+    const basicOf = (head: string): RepoGit => ({
+      commonDir: A,
+      level: "basic",
+      lastFetchAt: "2026-11-16T11:00:00+09:00",
+      folders: [{ path: "C:\\repo\\MyGame", slot: "MyGame", main: true, branch: null, head, detached: true, localOnly: null }],
+      branches: null,
+      stashes: null,
+      localOnly: null,
+      flags: null,
+      error: null,
+    });
+    const [same] = mergeRepos([basicOf("d1")], fullRepos({ schema: "x", repos: [last] }))!;
+    expect(same).toMatchObject({ level: "full", lastFetchAt: "2026-11-16T11:00:00+09:00", localOnly: lo, flags: ["detached-local-only"] });
+    expect(same.branches).toEqual(last.branches);
+    expect(same.folders![0].localOnly).toEqual(lo);
+    // Moved to another commit: the old count no longer applies
+    const [moved] = mergeRepos([basicOf("d2")], fullRepos({ schema: "x", repos: [last] }))!;
+    expect(moved.folders![0].localOnly).toBeNull();
+  });
+
   it("warns per branch, once per tip, instead of once per repository", () => {
     const lo = { commits: 7, oldestAt: "2026-10-01T09:00:00+09:00" };
     const slots = [slot("MyGame", git(A, { localOnly: OLD })), slot("MyGame-1", git(B, { localOnly: OLD }))];
