@@ -5,7 +5,9 @@
  * checked and clicked without Tauri.
  *
  * Preview query (browser only): ?sample=<name> ?lang=ko|en ?theme=system|light|dark
- * ?view=slots ?select=<slot> ?nav=projects|warnings|log|closed ?body=hidden ?frame=<width>x<height> (main.ts).
+ * ?view=slots|branches ?select=<slot or item key: g:<project>, x:extra, e:<pid>> ?project=<name>
+ * ?filter=all|open|attention ?nav=projects|warnings|log|closed ?body=hidden ?sheet=open
+ * ?frame=<width>x<height> (main.ts).
  */
 import { invoke } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";

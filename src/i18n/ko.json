@@ -75,7 +75,6 @@
   "detail.clientAlive": "실행 중",
   "detail.clientGone": "끝남",
   "detail.gitLine": "{branch} · 변경 {changes} · ↑{ahead} ↓{behind}",
-  "detail.gitFullLine": "원격에 없는 커밋 {localOnly} · 브랜치 {total} · upstream 없음 {noUpstream} · 사라짐 {gone} · stash {stash}",
   "detail.gitFullPending": "자세한 git 상태는 다음 정밀 조회 때 나와요",
   "detail.worktrees": "같은 저장소의 다른 폴더: {list}",
   "detail.branches": "브랜치",
@@ -89,7 +88,6 @@
   "detail.recentLine": "열기 {open} · 닫기 {close}",
   "detail.none": "-",
 
-  "btn.folder": "폴더",
   "btn.log": "로그",
   "btn.copyPath": "경로 복사",
   "toast.copied": "복사했어요",
@@ -366,7 +364,6 @@
   "theme.dark": "다크 테마",
   "dialog.ok": "확인",
 
-  "extra.title": "등록 안 된 에디터와 고아 워커",
   "extra.note": "슬롯이 아니라서 이 앱은 열거나 닫지 않아요. 필요하면 직접 정리하세요.",
   "extra.editorLine": "에디터 pid {pid} · {project} · {gb} GB · {time} 시작",
   "extra.workerLine": "워커 pid {pid} · 주인 {owner} · {project} · {gb} GB",

@@ -1,7 +1,9 @@
 /*
- * Slot list, details and side panel content. The rows keep the widget's card drawing (view.ts):
- * name line, state line, colored numbers without backgrounds, tinted rows for attention.
- * Colors are theme tokens (src/shell/theme); nothing here is translucent.
+ * Slot screen, details and side panel content. The rows keep the widget's card drawing (view.ts):
+ * name line, state line, colored numbers without backgrounds, tinted rows for attention. Group heads
+ * are items too (select, fold). Below 720px, or with the details column folded, the details open
+ * over the list (#app[data-sheet="open"]). Colors are theme tokens (src/shell/theme); nothing here
+ * is translucent.
  */
 
 .muted {
@@ -27,6 +29,54 @@
   flex-wrap: wrap;
   gap: 6px 10px;
   padding: 8px 12px 6px;
+}
+/* The project shown: a button that opens a menu (the side panel's project rows are the same state) */
+.pick-btn {
+  flex: 0 1 auto;
+  min-width: 0;
+  max-width: 220px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 26px;
+  padding: 0 6px 0 10px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--bg);
+  color: var(--fg);
+  font-size: 12px;
+  cursor: pointer;
+}
+.pick-btn:hover {
+  background: color-mix(in srgb, var(--fg) 5%, var(--bg));
+}
+.pick-btn.on {
+  border-color: var(--accent);
+  background: var(--selected-bg);
+  font-weight: 600;
+}
+.pick-btn:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+.pick-label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.pick-btn svg {
+  flex: none;
+  width: 14px;
+  height: 14px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.4;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+#filter-chips[hidden] {
+  display: none;
 }
 #find {
   flex: 1 1 160px;
@@ -143,30 +193,101 @@
   color: var(--info);
 }
 
-/* ---- groups ---- */
+/* ---- groups: the head is an item (selected, folded with Enter, left/right or its chevron) ---- */
 .group {
   display: flex;
   flex-direction: column;
 }
-.section-label {
+.group-head {
   display: flex;
-  flex: none;
-  height: 24px;
+  flex-direction: column;
+  gap: 2px;
+  padding: 3px 4px 3px 2px;
+  margin-bottom: 4px;
+  border-bottom: 1px solid var(--line);
+  border-radius: 4px 4px 0 0;
+  color: var(--muted);
+  cursor: pointer;
+  user-select: none;
+}
+.group-head.static {
+  cursor: default;
+}
+.group-head:not(.static):hover {
+  background: var(--hover);
+}
+.group-head.selected {
+  background: var(--selected-bg);
+  box-shadow: inset 2px 0 0 var(--accent);
+}
+#list:focus-visible .group-head.selected {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+.group-line {
+  display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  padding: 0 4px;
+  gap: 4px;
+  min-width: 0;
+  height: 20px;
+}
+.group-name {
   font-size: 11px;
   font-weight: 600;
   letter-spacing: 0.04em;
   text-transform: uppercase;
-  color: var(--muted);
-  border-bottom: 1px solid var(--line);
-  margin-bottom: 4px;
 }
-.section-label .stat {
+.group-head .stat {
   letter-spacing: normal;
-  text-transform: none;
+}
+.fold {
+  flex: none;
+  display: inline-grid;
+  place-items: center;
+  width: 16px;
+  height: 16px;
+  border-radius: 3px;
+}
+.fold:hover {
+  background: var(--pressed);
+  color: var(--fg);
+}
+.fold svg {
+  width: 12px;
+  height: 12px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.6;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  transform: rotate(90deg);
+  transition: transform 0.15s;
+}
+.group-head[aria-expanded="false"] .fold svg {
+  transform: none;
+}
+@media (prefers-reduced-motion: reduce) {
+  .fold svg {
+    transition: none;
+  }
+}
+/* A git directory several slots share: its own numbers, once */
+.repo-line {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 2px 8px;
+  padding-left: 20px;
+  font-size: 11px;
+}
+.repo-line .pills {
+  margin-left: auto;
+}
+.repo-label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .slots {
   list-style: none;
@@ -178,7 +299,8 @@
 }
 
 /* ---- slot row ---- */
-.slot {
+.slot,
+.extra-row {
   display: flex;
   flex-direction: column;
   gap: 3px;
@@ -187,8 +309,26 @@
   border: 1px solid transparent;
   cursor: pointer;
 }
-.slot:hover {
+.slot:hover,
+.extra-row:hover {
   background: var(--hover);
+}
+.extra-row.selected {
+  background: var(--selected-bg);
+  box-shadow: inset 2px 0 0 var(--accent);
+}
+#list:focus-visible .extra-row.selected {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+.extra-dot {
+  border-style: dashed;
+  border-color: var(--warn);
+}
+.path-part {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  flex-shrink: 1;
 }
 .slot.tint-warn {
   background: var(--tint-warn);
@@ -210,8 +350,8 @@
   outline: 2px solid var(--accent);
   outline-offset: -2px;
 }
-/* Focus on the list before a row is chosen: mark the list itself */
-#list:focus-visible:not(:has(.slot.selected)) {
+/* Focus on the list before an item is chosen: mark the list itself */
+#list:focus-visible:not(:has(.item.selected)) {
   outline: 2px solid var(--accent);
   outline-offset: -2px;
 }
@@ -309,6 +449,23 @@
   text-overflow: ellipsis;
   min-width: 0;
 }
+/* A name that shortens in the middle (view.ts nameHtml): the head takes the ellipsis, the tail stays */
+.mid {
+  display: inline-flex;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+}
+.mid-head {
+  flex: 0 1 auto;
+  min-width: 1.5em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.mid-tail {
+  flex: none;
+  white-space: pre;
+}
 /* Platform and tags are plain text: small caps in the info color, then muted words */
 .chip {
   flex: none;
@@ -371,31 +528,26 @@
   font-family: var(--font-mono);
   font-size: 11px;
 }
-.d-actions {
-  display: inline-flex;
-  gap: 2px;
-  margin-left: 4px;
-  vertical-align: middle;
-}
-.mini {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 22px;
-  height: 20px;
+/* A button that reads as a link (details rows, the projects panel) */
+.link-btn {
+  padding: 0;
   border: 0;
-  border-radius: 4px;
-  background: transparent;
-  color: var(--muted);
+  background: none;
+  color: var(--accent);
+  font: inherit;
+  text-decoration: underline;
+  text-underline-offset: 2px;
   cursor: pointer;
 }
-.mini:hover {
-  background: var(--hover);
+.link-btn.warn-text {
+  color: var(--warn);
+}
+.link-btn:hover {
   color: var(--fg);
 }
-.mini:focus-visible {
+.link-btn:focus-visible {
   outline: 2px solid var(--accent);
-  outline-offset: -2px;
+  outline-offset: 1px;
 }
 .empty {
   margin: 0;
@@ -623,4 +775,121 @@
 #status-path:not(.flash) {
   font-family: var(--font-mono);
   font-size: 11.5px;
+}
+
+/* ---- the details column, more ---- */
+.body-sub {
+  margin: 16px 0 4px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: var(--muted);
+}
+.body-list {
+  margin: 0 -8px;
+}
+.body-list .panel-row > [class^="state-"] {
+  display: inline-flex;
+}
+.body-note {
+  margin: 14px 0 0;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--muted);
+}
+.list-note {
+  margin: 4px 4px 2px;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--muted);
+}
+
+/* ---- side panel: project rows ---- */
+.project-row .line1 {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+.project-row[aria-pressed="true"] {
+  background: var(--selected-bg);
+  box-shadow: inset 2px 0 0 var(--accent);
+}
+.project-row .grow {
+  font-weight: 600;
+}
+.project-row[data-project=""] .grow {
+  font-weight: 400;
+}
+
+/* ---- branch screen place (screens/branches.ts) ---- */
+.repo-row {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 6px 8px;
+  border-radius: 6px;
+}
+.repo-row.focus {
+  background: var(--selected-bg);
+  box-shadow: inset 2px 0 0 var(--accent);
+}
+
+/* ---- details over the list: below 720px, or with the details column folded ---- */
+#sheet-head {
+  display: none;
+}
+#app[data-sheet="open"][data-body] #body-main {
+  display: block;
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  /* Both lines: for an absolutely placed grid item an auto end line is the container's edge */
+  grid-column: 2 / 3;
+  grid-row: 3 / 4;
+  border-left: 0;
+  box-shadow: 0 8px 24px rgb(0 0 0 / 0.18);
+}
+#app[data-sheet="open"] #sheet-head {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 32px;
+  padding: 0 10px 0 6px;
+  border-bottom: 1px solid var(--line);
+  background: var(--bg);
+}
+#body-title .mid,
+#sheet-title .mid {
+  max-width: 100%;
+  vertical-align: bottom;
+}
+#sheet-title {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+/* Very narrow: the pin and the settings button stay in the [..] menu, the tabs keep their room */
+@media (max-width: 559px) {
+  #pin-btn,
+  #settings-btn {
+    display: none;
+  }
+  #app #list-head,
+  #app[data-body="hidden"] #list-head {
+    padding-right: calc(var(--controls-w) - 64px);
+  }
+  #list-tools,
+  #list-inner {
+    padding-left: 8px;
+    padding-right: 8px;
+  }
 }

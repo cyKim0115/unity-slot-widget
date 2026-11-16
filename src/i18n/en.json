@@ -75,7 +75,6 @@
   "detail.clientAlive": "running",
   "detail.clientGone": "exited",
   "detail.gitLine": "{branch} · changes {changes} · ↑{ahead} ↓{behind}",
-  "detail.gitFullLine": "on no remote {localOnly} · branches {total} · no upstream {noUpstream} · gone {gone} · stash {stash}",
   "detail.gitFullPending": "Detailed git state comes with the next full check",
   "detail.worktrees": "Other folders of this repository: {list}",
   "detail.branches": "Branches",
@@ -89,7 +88,6 @@
   "detail.recentLine": "opened {open} · closed {close}",
   "detail.none": "-",
 
-  "btn.folder": "Folder",
   "btn.log": "Log",
   "btn.copyPath": "Copy path",
   "toast.copied": "Copied",
@@ -366,7 +364,6 @@
   "theme.dark": "Dark theme",
   "dialog.ok": "OK",
 
-  "extra.title": "Unregistered editors and orphan workers",
   "extra.note": "They are not slots, so this app neither opens nor closes them. Clean them up yourself if needed.",
   "extra.editorLine": "editor pid {pid} · {project} · {gb} GB · started {time}",
   "extra.workerLine": "worker pid {pid} · owner {owner} · {project} · {gb} GB",

@@ -15,7 +15,7 @@
       reaches the top edge and together they form the title bar. Columns: side panel (#nav),
       list (free width), details (#body-main, sized at its left edge). Texts come from data-t keys.
     -->
-    <div id="app" data-nav="closed" data-body="open" class="no-anim">
+    <div id="app" data-nav="closed" data-body="open" data-sheet="closed" class="no-anim">
       <button id="nav-toggle" class="icon-btn" type="button" aria-controls="nav" aria-expanded="false">
         <svg viewBox="0 0 16 16" aria-hidden="true"><rect x="1.75" y="2.75" width="12.5" height="10.5" rx="2" /><path d="M6.25 2.75v10.5" /></svg>
       </button>
@@ -58,7 +58,8 @@
 
       <header id="list-head" class="col-header drag-region">
         <div id="view-tabs" role="tablist" data-t-aria="view.tabs">
-          <button id="view-slots" class="view-tab" type="button" role="tab" data-view="slots" aria-selected="true" aria-controls="list-main"></button>
+          <button id="view-slots" class="view-tab" type="button" role="tab" data-view="slots" aria-selected="true" aria-controls="list-main" data-t-title="view.slotsTitle"></button>
+          <button id="view-branches" class="view-tab" type="button" role="tab" data-view="branches" aria-selected="false" aria-controls="list-main" data-t-title="view.branchesTitle"></button>
         </div>
       </header>
 
@@ -70,6 +71,10 @@
 
       <section id="list-main">
         <div id="list-tools">
+          <button id="project-btn" class="pick-btn" type="button" aria-haspopup="menu" data-t-aria="project.label">
+            <span class="pick-label"></span>
+            <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M4.5 6.25L8 9.75l3.5-3.5" /></svg>
+          </button>
           <label id="find">
             <svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="7" cy="7" r="4.25" /><path d="M10.25 10.25l3.5 3.5" /></svg>
             <input id="find-input" type="search" autocomplete="off" spellcheck="false" data-t-placeholder="find.placeholder" data-t-aria="find.label" />
@@ -80,14 +85,23 @@
             <button type="button" role="radio" class="chip-btn" data-filter="attention" data-t="filter.attention"></button>
           </div>
         </div>
-        <div id="list" tabindex="0" role="listbox" data-t-aria="list.label"><div id="list-inner"></div></div>
+        <div id="list" tabindex="0" role="tree" data-t-aria="list.label"><div id="list-inner"></div></div>
       </section>
 
       <div id="body-resizer" role="separator" aria-orientation="vertical" tabindex="0" data-t-aria="resizer.label" data-t-title="resizer.title"></div>
 
       <header id="body-head" class="col-header drag-region"><span id="body-title"></span></header>
 
-      <main id="body-main" tabindex="-1" data-t-aria="body.label"><div id="body-content"></div></main>
+      <main id="body-main" tabindex="-1" data-t-aria="body.label">
+        <!-- Shown only while the details open over the list (narrow window or details column folded) -->
+        <div id="sheet-head">
+          <button id="sheet-back" class="icon-btn small" type="button" data-t-title="sheet.back" data-t-aria="sheet.back">
+            <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M10 4L6 8l4 4" /></svg>
+          </button>
+          <span id="sheet-title"></span>
+        </div>
+        <div id="body-content"></div>
+      </main>
 
       <div id="title-controls" class="drag-region">
         <button id="pin-btn" class="icon-btn" type="button" aria-pressed="false" data-t-title="titlebar.pin" data-t-aria="titlebar.pin">
@@ -116,7 +130,7 @@
         <span id="status-next" data-drop="3"></span>
         <button id="status-git" type="button" data-drop="2"></button>
         <span id="status-fetch" data-drop="1"></span>
-        <button id="status-extra" type="button" hidden></button>
+        <button id="status-extra" type="button" data-drop="5" hidden></button>
         <button id="status-core" type="button" data-drop="4"></button>
       </footer>
       <!-- Status bar notices (flashStatus), read out by screen readers -->

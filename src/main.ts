@@ -1,9 +1,15 @@
 /**
  * Main window. It shows what `unity-slot dashboard -Json` reports and never closes or leases a
  * slot. The frame follows the author's Frond app (src/shell): title bar strips, a side panel with
- * square tabs (projects, warnings, recent events), the slot list in the free width, the selected
- * slot's details on the right, a banner for what needs a person now, and a status bar whose items
- * can be pressed. Notices show in the status bar for a moment (flashStatus) instead of toasts.
+ * square tabs (projects, warnings, recent events), the list in the free width, the selected item's
+ * details on the right, a banner for what needs a person now, and a status bar whose items can be
+ * pressed. Notices show in the status bar for a moment (flashStatus) instead of toasts.
+ *
+ * The slot screen (src/screens/slots.ts): project groups of two-line slot rows, then editors and
+ * workers outside the registry. ↑↓ Home End pick an item, Enter and ←/→ fold a group, Shift+F10
+ * opens the row's menu. Below 720px, or with the details column folded (Ctrl+\), the details open
+ * over the list (the same drawing, Esc closes). The screen state (selection, filters, project,
+ * folded groups, side panel, widths) comes back on the next start (localStorage, shell/prefs).
  *
  * A slot row's right-click menu and the details buttons:
  * - Open in Unity: `unity-slot open <slot> -NoWait` through the core, which makes the checks and
@@ -11,12 +17,13 @@
  *   batchmode slot; on an open slot it becomes Show Unity window (brings it to the front).
  *   There is no shortcut for it: starting an editor by accident costs a lot of memory.
  * - Open: the folder in another program (Fork by default). Show in Explorer. Log. Copy path.
+ * - This slot's branches (the branch screen), this slot's cleanup request.
  *
  * Refresh rhythm
  * - full check (`dashboard -Json -Git basic`): every `idleSecs`, every `startingSecs` while an
  *   editor is starting (for up to five minutes), and one second after a quick change signal;
- * - detailed git (`-Git full`): every `gitFullMins`, and when a slot is selected and the last one is
- *   older than a minute;
+ * - detailed git (`-Git full`): every `gitFullMins`, and when a slot is selected or the branch
+ *   screen opens and the last one is older than a minute;
  * - quick change signal: signals.rs, every `signalSecs` (Unity.exe ids + slot files);
  * - minimized, all of this goes on; nothing while the window is hidden to the tray.
  *
@@ -25,16 +32,51 @@
  */
 
 import { call, inTauri, isWindowVisible, on } from "./backend";
-import { applyDomTexts, currentLang, formatClock, formatDuration, formatGb, formatWhen, resolveLang, setLang, t } from "./i18n";
+import { applyDomTexts, currentLang, formatClock, formatDuration, formatWhen, resolveLang, setLang, t } from "./i18n";
 import { glance, newRisks } from "./glance";
-import { cleanupRequest, elapsedSince, isOpen, mergeGit, nowFor, warnings, type Warning } from "./model";
-import { bodyMessage, logPanel, projectsPanel, slotBody, warningsPanel, type UnityButton } from "./panels";
+import {
+  cleanupRequest,
+  elapsedSince,
+  groupName,
+  isOpen,
+  mergeGit,
+  nowFor,
+  projectGroups,
+  sharedRepos,
+  urgentItems,
+  warnedSlots,
+  warnings,
+  type CleanupScope,
+  type Urgent,
+  type Warning,
+} from "./model";
+import { logPanel } from "./panels/log";
+import { projectsPanel } from "./panels/projects";
+import { warningsPanel } from "./panels/warnings";
+import { branchesNote, branchesPlaceholder, branchesTabLabel } from "./screens/branches";
+import {
+  buildSlotList,
+  EXTRA_KEY,
+  extraBody,
+  extraTitle,
+  groupBody,
+  groupKey,
+  parseKey,
+  projectOf,
+  SLOT_FILTERS,
+  slotBody,
+  slotKey,
+  slotListHtml,
+  type ItemRef,
+  type SlotFilter,
+  type SlotListView,
+  type UnityButton,
+} from "./screens/slots";
 import { relabelBanner, setBannerFocusHome, showBanner, type BannerState } from "./shell/banner";
 import { hideContextMenu, isContextMenuOpen, showContextMenu, showMenuAbove, showMenuBelow, type MenuEntry } from "./shell/context-menu";
-import { showDialog } from "./shell/dialog";
 import { initKeys } from "./shell/keys";
 import { initNav } from "./shell/nav";
-import { isString, readPref, writePref } from "./shell/prefs";
+import { isBoolean, readPref, writePref } from "./shell/prefs";
 import { initBodyResize } from "./shell/resize";
 import { fitStatusbar, flashStatus, setStatusPath } from "./shell/statusbar";
 import { initSettingsDialog } from "./shell/settings-dialog";
@@ -53,15 +95,17 @@ import {
 import { aboutPanel, autostartPanel, branchViewPanel, corePanel } from "./settings-panels";
 import type { AppInfo, Dashboard, DashboardResult, GitState, OpenResult, OpenTarget, Slot, WidgetSettings } from "./types";
 import { SUPPORTED_SCHEMA_MAJOR } from "./types";
-import { esc, slotList, type RowContext } from "./view";
+import { bodyMessage, esc, nameHtml, type RowContext } from "./view";
 
 const STARTING_CAP_MS = 5 * 60_000;
 const FIRST_LOOK_FULL_MS = 60_000;
 
-type SlotFilter = "all" | "open" | "attention";
-const FILTERS: readonly SlotFilter[] = ["all", "open", "attention"];
-const isFilter = (v: unknown): v is SlotFilter => FILTERS.includes(v as SlotFilter);
+type View = "slots" | "branches";
+const VIEWS: readonly View[] = ["slots", "branches"];
+const isView = (v: unknown): v is View => VIEWS.includes(v as View);
+const isFilter = (v: unknown): v is SlotFilter => SLOT_FILTERS.includes(v as SlotFilter);
 const isStringOrNull = (v: unknown): v is string | null => v === null || typeof v === "string";
+const isStringList = (v: unknown): v is string[] => Array.isArray(v) && v.every((x) => typeof x === "string");
 
 /** The settings in effect (src/settings.ts keeps them; this is its latest copy). */
 let settings: WidgetSettings = getSettings();
@@ -86,16 +130,25 @@ let glanceSent = "";
 let knownRisks = new Set<string>();
 let flashPending = false;
 
-/** Screen state, kept per PC in localStorage (shell/prefs). */
+/** Screen state, kept per PC in localStorage (shell/prefs). `selected` is an item key (screens/slots.ts). */
 let selected: string | null = readPref("selected", null, isStringOrNull);
 let filter: SlotFilter = readPref("slotFilter", "all", isFilter);
-let bodyOpen = readPref("bodyOpen", true, (v): v is boolean => typeof v === "boolean");
-let view = readPref("view", "slots", isString);
+let project: string | null = readPref("projectFilter", null, isStringOrNull);
+let collapsed = new Set<string>(readPref("collapsedGroups", [], isStringList));
+let bodyOpen = readPref("bodyOpen", true, isBoolean);
+let view: View = readPref("view", "slots", isView);
 let findText = "";
-/** The selected row's details open under it (when the details column is not on screen). */
-let inlineOpen = false;
-/** Scroll the selected row into view after the next list paint. */
-let revealSelection = false;
+/** The details shown over the list (narrow window, or the details column folded). */
+let sheetOpen = false;
+/** Scroll the selected row into view after the next list paint (the restored one, the first time). */
+let revealSelection = true;
+/** The slot whose repository the branch screen marks (「이 슬롯 브랜치 보기」). */
+let branchFocus: string | null = null;
+/** What the list shows now: its item keys are the keyboard order. */
+let listView: SlotListView | null = null;
+
+// A selection saved as a bare slot name by an older version
+if (selected && !/^[sgxew]:/.test(selected)) selected = slotKey(selected);
 
 function $(id: string): HTMLElement {
   const el = document.getElementById(id);
@@ -104,7 +157,7 @@ function $(id: string): HTMLElement {
 }
 
 const app = $("app");
-/** Below 1000px the side panel opens over the list; below 720px the details column hides. */
+/** Below 1000px the side panel opens over the list; below 720px the details open over the list. */
 const overlayQuery = matchMedia("(max-width: 999px)");
 const narrowQuery = matchMedia("(max-width: 719px)");
 
@@ -125,8 +178,17 @@ function slots(): Slot[] {
   return doc?.slots ?? [];
 }
 
+function findSlot(name: string | null | undefined): Slot | null {
+  return name ? (slots().find((s) => s.name === name) ?? null) : null;
+}
+
+function selectedRef(): ItemRef | null {
+  return parseKey(selected);
+}
+
 function selectedSlot(): Slot | null {
-  return selected ? (slots().find((s) => s.name === selected) ?? null) : null;
+  const ref = selectedRef();
+  return ref?.kind === "slot" ? findSlot(ref.name) : null;
 }
 
 /** The details column is on screen (not folded with Ctrl+\ and the window is wide enough). */
@@ -134,8 +196,22 @@ function bodyShown(): boolean {
   return bodyOpen && !narrowQuery.matches;
 }
 
+/** Without the details column, the details open over the list. */
+function sheetMode(): boolean {
+  return !bodyShown();
+}
+
+function setSheet(open: boolean) {
+  sheetOpen = open && sheetMode();
+  app.dataset.sheet = sheetOpen ? "open" : "closed";
+}
+
 function currentWarnings(): Warning[] | null {
   return doc ? warnings(doc, settings, now(), gitOf) : null;
+}
+
+function rowContext(): RowContext {
+  return { now: now(), settings, gitOf, shared: sharedRepos(slots(), gitOf), events: doc?.recentEvents ?? [] };
 }
 
 // ---------------------------------------------------------------- refresh
@@ -209,6 +285,11 @@ async function refresh(forceFull: boolean) {
   }
 }
 
+/** The detailed git state when it is older than a minute (a first look at a slot, the branch screen). */
+function freshenFull() {
+  if (lastFullAt !== 0 && Date.now() - lastFullAt > FIRST_LOOK_FULL_MS) void refresh(true);
+}
+
 /** A risk that was not there at the last refresh flashes the taskbar (setting flashTaskbar). */
 function noteRisks() {
   if (!doc) return;
@@ -263,6 +344,8 @@ function errorText(code: string): string {
 }
 
 function render() {
+  // A saved project that is no longer registered shows every project (the saved value stays)
+  if (doc && project !== null && !projectGroups(slots()).has(project)) project = null;
   renderList();
   renderBody();
   renderPanels();
@@ -270,76 +353,71 @@ function render() {
   renderStatus();
 }
 
-function rowContext(expanded: Set<string>): RowContext {
-  return { now: now(), settings, expanded, gitOf };
+function errorMessage(): string {
+  return bodyMessage(errorText(lastError!), { error: true, retry: true, settings: lastError!.startsWith("core-not-found") });
 }
 
-/** Slot names with a critical or attention warning (filter chip, project marks). */
-function warnedSlots(list: Warning[] | null): Set<string> {
-  return new Set((list ?? []).filter((w) => w.slot && w.severity !== "info").map((w) => w.slot!));
-}
-
-function matchesFind(slot: Slot, text: string): boolean {
-  if (!text) return true;
-  const git = gitOf(slot);
-  return [slot.name, slot.path, slot.project, slot.repo, git?.branch, slot.lease?.owner, slot.memo]
-    .filter((v): v is string => typeof v === "string")
-    .some((v) => v.toLowerCase().includes(text));
-}
-
-function visibleSlots(): Slot[] {
-  const warned = filter === "attention" ? warnedSlots(currentWarnings()) : null;
-  const text = findText.trim().toLowerCase();
-  return slots().filter((s) => {
-    if (filter === "open" && !isOpen(s)) return false;
-    if (warned && !warned.has(s.name)) return false;
-    return matchesFind(s, text);
-  });
-}
-
-function renderList() {
-  const inner = $("list-inner");
+function renderTools() {
   $("view-slots").textContent = t("view.slots", { n: slots().length });
+  $("view-branches").textContent = branchesTabLabel(doc);
   document.querySelectorAll<HTMLElement>("#filter-chips [data-filter]").forEach((b) => {
     const on = b.dataset.filter === filter;
     b.setAttribute("aria-checked", String(on));
     // One tab stop for the group (radio pattern); ←/→ move between the chips
     b.tabIndex = on ? 0 : -1;
   });
+  // The slot filter belongs to the slot screen; the branch screen brings its own
+  $("filter-chips").hidden = view !== "slots";
+  const pick = $("project-btn");
+  pick.querySelector(".pick-label")!.textContent = project ?? t("panel.allProjects");
+  pick.classList.toggle("on", project !== null);
+  pick.title = t("project.title");
+}
+
+function renderList() {
+  renderTools();
+  const inner = $("list-inner");
+  const list = $("list");
+  list.removeAttribute("aria-activedescendant");
   if (!doc) {
+    listView = null;
     // Without a document the details column carries the message; in a narrow window, the list
     inner.innerHTML = lastError
       ? bodyShown()
         ? ""
-        : bodyMessage(errorText(lastError), { error: true, retry: true, settings: lastError.startsWith("core-not-found") })
+        : errorMessage()
       : `<p class="empty">${esc(t("footer.loading"))}</p>`;
     return;
   }
-  const shown = visibleSlots();
-  if (!slots().length) inner.innerHTML = `<p class="empty">${esc(t("empty.noSlots"))}</p>`;
-  else if (!shown.length) inner.innerHTML = `<p class="empty">${esc(t("list.noMatch"))}</p>`;
-  else {
-    const expanded = new Set<string>(!bodyShown() && inlineOpen && selected ? [selected] : []);
-    inner.innerHTML = slotList({ ...doc, slots: shown }, rowContext(expanded));
+  if (view === "branches") {
+    listView = null;
+    list.setAttribute("role", "region");
+    list.setAttribute("aria-label", t("view.branchesLabel"));
+    inner.innerHTML = branchesPlaceholder(doc, project, rowContext(), branchFocus);
+    if (revealSelection) inner.querySelector(".repo-row.focus")?.scrollIntoView({ block: "nearest" });
+    revealSelection = false;
+    return;
   }
-  // Selection mark and list semantics on the drawn rows
-  const list = $("list");
-  list.removeAttribute("aria-activedescendant");
-  inner.querySelectorAll<HTMLElement>("section.group").forEach((section) => {
-    section.setAttribute("role", "presentation");
-    const ul = section.querySelector("ul.slots");
-    ul?.setAttribute("role", "group");
-    ul?.setAttribute("aria-label", section.dataset.group ?? "");
-  });
-  inner.querySelectorAll<HTMLElement>("li.slot[data-toggle]").forEach((li, i) => {
-    li.id = `slot-row-${i}`;
-    li.setAttribute("role", "option");
-    const on = li.dataset.toggle === selected;
-    li.classList.toggle("selected", on);
-    li.setAttribute("aria-selected", String(on));
+  list.setAttribute("role", "tree");
+  list.setAttribute("aria-label", t("list.label"));
+  const ctx = rowContext();
+  listView = buildSlotList(
+    doc,
+    { filter, project, find: findText, collapsed, warned: warnedSlots(currentWarnings()) },
+    ctx,
+  );
+  if (!slots().length && !listView.extra) inner.innerHTML = `<p class="empty">${esc(t("empty.noSlots"))}</p>`;
+  else if (!listView.keys.length) inner.innerHTML = `<p class="empty">${esc(t("list.noMatch"))}</p>`;
+  else inner.innerHTML = slotListHtml(listView, ctx);
+  // Ids for aria-activedescendant and the selection mark
+  inner.querySelectorAll<HTMLElement>("[data-item]").forEach((el, i) => {
+    el.id = `item-${i}`;
+    const on = el.dataset.item === selected;
+    el.classList.toggle("selected", on);
+    el.setAttribute("aria-selected", String(on));
     if (on) {
-      list.setAttribute("aria-activedescendant", li.id);
-      if (revealSelection) li.scrollIntoView({ block: "nearest" });
+      list.setAttribute("aria-activedescendant", el.id);
+      if (revealSelection) el.scrollIntoView({ block: "nearest" });
     }
   });
   revealSelection = false;
@@ -350,70 +428,103 @@ function unityButton(slot: Slot): UnityButton {
   return action.kind === "focus" ? { kind: "focus" } : action;
 }
 
+function itemTitle(ref: ItemRef | null): string {
+  if (!ref) return t("app.title");
+  switch (ref.kind) {
+    case "slot":
+    case "group":
+      return ref.name;
+    case "extra":
+      return extraTitle(doc?.unregisteredEditors?.length ?? 0, doc?.orphanWorkers?.length ?? 0);
+    case "editor":
+      return t("extra.editor", { pid: ref.pid });
+    case "worker":
+      return t("extra.worker", { pid: ref.pid });
+  }
+}
+
+function bodyContent(): string {
+  if (!doc) return lastError ? errorMessage() : bodyMessage(t("footer.loading"));
+  if (view === "branches") return bodyMessage(branchesNote(doc), { hint: t("body.branchesHint") });
+  if (!slots().length && !doc.unregisteredEditors?.length && !doc.orphanWorkers?.length) return bodyMessage(t("empty.noSlots"));
+  const ref = selectedRef();
+  const ctx = rowContext();
+  switch (ref?.kind) {
+    case "slot": {
+      const slot = findSlot(ref.name);
+      if (slot) return slotBody(slot, ctx, unityButton(slot), settings.openTarget);
+      break;
+    }
+    case "group": {
+      const members = projectGroups(slots()).get(ref.name);
+      if (members) {
+        const g = listView?.groups.find((x) => x.name === ref.name);
+        const groupView = g ?? { name: ref.name, key: groupKey(ref.name), members, shown: members, collapsed: false, repos: [] };
+        return groupBody(groupView, ctx, project === ref.name);
+      }
+      break;
+    }
+    case "extra":
+    case "editor":
+    case "worker":
+      return extraBody(doc, ref, ctx);
+  }
+  return bodyMessage(t("body.noSelection"), { hint: t("body.hint") });
+}
+
 function renderBody() {
-  const slot = selectedSlot();
-  $("body-title").textContent = slot?.name ?? t("app.title");
-  const content = $("body-content");
-  if (!doc) {
-    content.innerHTML = lastError
-      ? bodyMessage(errorText(lastError), { error: true, retry: true, settings: lastError.startsWith("core-not-found") })
-      : bodyMessage(t("footer.loading"));
-    return;
-  }
-  if (!slots().length) {
-    content.innerHTML = bodyMessage(t("empty.noSlots"));
-    return;
-  }
-  if (!slot) {
-    content.innerHTML = bodyMessage(t("body.noSelection"), { hint: t("body.hint") });
-    return;
-  }
-  content.innerHTML = slotBody(slot, rowContext(new Set()), unityButton(slot), settings.openTarget);
+  const title = view === "branches" ? t("view.branchesLabel") : itemTitle(doc ? selectedRef() : null);
+  // Long slot names shorten in the middle here too (the clone number stays)
+  $("body-title").innerHTML = nameHtml(title, "title-name");
+  $("sheet-title").innerHTML = nameHtml(title, "title-name");
+  $("body-content").innerHTML = bodyContent();
 }
 
 function renderPanels() {
   const list = currentWarnings();
-  $("projects-body").innerHTML = projectsPanel(doc, settings, warnedSlots(list));
+  $("projects-body").innerHTML = projectsPanel(doc, settings, warnedSlots(list), project, doc ? rowContext() : null);
   $("warnings-body").innerHTML = warningsPanel(list);
   $("log-body").innerHTML = logPanel(doc ? (doc.recentEvents ?? []) : null, now());
   const counted = (list ?? []).filter((w) => w.severity !== "info");
   nav.setBadge("warnings", counted.length, counted.some((w) => w.severity === "critical") ? "critical" : "warn");
 }
 
-/** One banner at most: a core error while a document is on screen, a stalled start, critical commit. */
+function focusEditor(pid: number) {
+  void call("focus_editor", { pid }).catch((e) => flashStatus(unityError(String(e)), 5000));
+}
+
+/** One banner at most, the most urgent (model.ts `urgentItems`); the rest are counted toward the warnings panel. */
 function bannerState(): BannerState | null {
-  if (lastError && doc) {
-    return {
-      key: `error:${lastError}`,
-      message: `${errorText(lastError)} ${t("error.keepLast")}`,
-      warn: true,
-      actions: [{ label: t("body.retry"), run: () => void refresh(true) }],
-    };
+  const items = urgentItems(doc, settings, lastError);
+  if (!items.length) return null;
+  const first: Urgent = items[0];
+  const critical = (currentWarnings() ?? []).filter((w) => w.severity === "critical").length;
+  // The error is no warning; the others are among the critical ones
+  const rest = first.kind === "error" ? critical : critical - 1;
+  const more: BannerState["actions"] = rest > 0 ? [{ label: t("banner.more", { n: rest }), run: () => nav.show("warnings") }] : [];
+  switch (first.kind) {
+    case "error":
+      return {
+        key: `error:${first.code}`,
+        message: `${errorText(first.code)} ${t("error.keepLast")}`,
+        warn: true,
+        actions: [{ label: t("body.retry"), run: () => void refresh(true) }, ...more],
+      };
+    case "stalled": {
+      const pid = first.slot.editor?.pid;
+      return {
+        key: `stalled:${items.filter((i) => i.kind === "stalled").map((i) => (i.kind === "stalled" ? i.slot.name : "")).join(",")}`,
+        message: t("banner.stalled", {
+          slot: first.slot.name,
+          duration: formatDuration(elapsedSince(first.slot.editor?.startedAt, now()) ?? 0),
+        }),
+        warn: true,
+        actions: [...(pid ? [{ label: t("menu.focusUnity"), run: () => focusEditor(pid) }] : []), ...more],
+      };
+    }
+    case "commit":
+      return { key: "commit-critical", message: t("banner.commitCritical", { percent: first.percent }), warn: true, actions: more };
   }
-  if (!doc) return null;
-  const critical = (currentWarnings() ?? []).filter((w) => w.severity === "critical");
-  const more = (shown: number): BannerState["actions"] =>
-    critical.length > shown ? [{ label: t("banner.more", { n: critical.length - shown }), run: () => nav.show("warnings") }] : [];
-  const stalled = slots().filter((s) => s.editor?.state === "stalled");
-  if (stalled.length) {
-    const first = stalled[0];
-    const pid = first.editor?.pid;
-    const actions = pid ? [{ label: t("menu.focusUnity"), run: () => void call("focus_editor", { pid }).catch((e) => flashStatus(unityError(String(e)))) }] : [];
-    return {
-      key: `stalled:${stalled.map((s) => s.name).join(",")}`,
-      message: t("banner.stalled", {
-        slot: first.name,
-        duration: formatDuration(elapsedSince(first.editor?.startedAt, now()) ?? 0),
-      }),
-      warn: true,
-      actions: [...actions, ...(more(1) ?? [])],
-    };
-  }
-  const percent = doc.system?.commit?.percent;
-  if (typeof percent === "number" && percent >= settings.commitCriticalPercent) {
-    return { key: "commit-critical", message: t("banner.commitCritical", { percent }), warn: true, actions: more(1) };
-  }
-  return null;
 }
 
 function renderBanner() {
@@ -426,9 +537,19 @@ function shortPath(path: string): string {
   return parts.length > 1 ? `..\\${parts[parts.length - 1]}` : path;
 }
 
+/** The path of the selected item: a slot folder, or the project folder of an editor or worker. */
+function selectedPath(): string | null {
+  const ref = selectedRef();
+  if (!ref || !doc) return null;
+  if (ref.kind === "slot") return findSlot(ref.name)?.path ?? null;
+  if (ref.kind === "editor") return doc.unregisteredEditors?.find((e) => e.pid === ref.pid)?.project ?? null;
+  if (ref.kind === "worker") return doc.orphanWorkers?.find((w) => w.pid === ref.pid)?.project ?? null;
+  return null;
+}
+
 function renderStatus() {
-  const slot = selectedSlot();
-  setStatusPath(slot ? shortPath(slot.path) : "", slot?.path ?? "");
+  const path = selectedPath();
+  setStatusPath(path ? shortPath(path) : "", path ?? "");
 
   const list = currentWarnings() ?? [];
   const counted = list.filter((w) => w.severity !== "info");
@@ -446,7 +567,7 @@ function renderStatus() {
     editors.hidden = false;
     editors.textContent = t("status.editors", { open, max });
     editors.className = open >= max && max > 0 ? "warn" : "";
-    editors.title = t(filter === "open" ? "status.editorsAll" : "status.editorsTitle");
+    editors.title = t(filter === "open" && view === "slots" ? "status.editorsAll" : "status.editorsTitle");
     const percent = doc.system?.commit?.percent;
     commit.hidden = typeof percent !== "number";
     if (typeof percent === "number") {
@@ -497,6 +618,7 @@ function renderStatus() {
     .filter(Boolean)
     .join(" · ");
   extra.className = "warn";
+  extra.title = t("status.extraTitle");
 
   const core = $("status-core");
   core.textContent = lastResult?.source === "sample" ? t("footer.sample") : doc?.version ? t("footer.core", { version: doc.version }) : "";
@@ -519,29 +641,83 @@ function tick() {
 
 // ---------------------------------------------------------------- selection and screen state
 
-function select(name: string | null, opts: { toggleInline?: boolean; reveal?: boolean } = {}) {
-  const same = name === selected;
-  selected = name;
-  writePref("selected", name);
-  // Without the details column, a click opens the row in place (a second click folds it); keys keep it as it is
-  if (!bodyShown() && opts.toggleInline) inlineOpen = same ? !inlineOpen : true;
+function saveCollapsed() {
+  writePref("collapsedGroups", [...collapsed]);
+}
+
+/** The group key a selection sits in (a slot's project, the extra group of an editor or worker). */
+function parentKey(ref: ItemRef | null): string | null {
+  if (!ref) return null;
+  if (ref.kind === "slot") {
+    const slot = findSlot(ref.name);
+    return slot ? groupKey(groupName(slot)) : null;
+  }
+  if (ref.kind === "editor" || ref.kind === "worker") return EXTRA_KEY;
+  return null;
+}
+
+/**
+ * Selects an item. `open` shows the details over the list when the details column is not on
+ * screen (a press on a row: pressing the open one again closes them). `reveal` scrolls it into view.
+ */
+function select(key: string | null, opts: { open?: boolean; reveal?: boolean } = {}) {
+  const same = key === selected;
+  selected = key;
+  writePref("selected", key);
+  const ref = parseKey(key);
+  // A slot in a folded group (picked from a panel): unfold it
+  const parent = parentKey(ref);
+  if (parent && collapsed.delete(parent)) saveCollapsed();
+  if (opts.open && sheetMode()) setSheet(same ? !sheetOpen : true);
   revealSelection = opts.reveal === true;
   // First look at a slot: bring the detailed git state if it is old
-  if (name && !same && Date.now() - lastFullAt > FIRST_LOOK_FULL_MS && lastFullAt !== 0) void refresh(true);
+  if (ref?.kind === "slot" && !same) freshenFull();
   render();
 }
 
-function rowNames(): string[] {
-  return Array.from(document.querySelectorAll<HTMLElement>("#list-inner li.slot[data-toggle]")).map((li) => li.dataset.toggle!);
+function moveSelection(to: "next" | "prev" | "first" | "last") {
+  const keys = listView?.keys ?? [];
+  if (!keys.length) return;
+  const i = selected ? keys.indexOf(selected) : -1;
+  const index =
+    to === "first" ? 0 : to === "last" ? keys.length - 1 : to === "next" ? Math.min(keys.length - 1, i + 1) : Math.max(0, i < 0 ? 0 : i - 1);
+  select(keys[index], { reveal: true });
 }
 
-function moveSelection(to: "next" | "prev" | "first" | "last") {
-  const names = rowNames();
-  if (!names.length) return;
-  const i = selected ? names.indexOf(selected) : -1;
-  const index =
-    to === "first" ? 0 : to === "last" ? names.length - 1 : to === "next" ? Math.min(names.length - 1, i + 1) : Math.max(0, i < 0 ? 0 : i - 1);
-  select(names[index], { reveal: true });
+function toggleGroup(key: string, open?: boolean) {
+  const fold = open === undefined ? !collapsed.has(key) : !open;
+  if (fold) collapsed.add(key);
+  else collapsed.delete(key);
+  saveCollapsed();
+  // The selection inside a group that folds moves to its head
+  if (fold && parentKey(selectedRef()) === key) {
+    selected = key;
+    writePref("selected", key);
+  }
+  render();
+}
+
+/** ←/→ on the list: fold, unfold, go to the group head or into the group (tree pattern). */
+function stepTree(right: boolean): boolean {
+  const ref = selectedRef();
+  if (!ref || !listView) return false;
+  if (ref.kind === "group" || ref.kind === "extra") {
+    const key = selected!;
+    const isCollapsed = collapsed.has(key);
+    if (!right && !isCollapsed) toggleGroup(key, false);
+    else if (right && isCollapsed) toggleGroup(key, true);
+    else if (right) {
+      const keys = listView.keys;
+      const next = keys[keys.indexOf(key) + 1];
+      if (next && parentKey(parseKey(next)) === key) select(next, { reveal: true });
+    }
+    return true;
+  }
+  if (!right) {
+    const parent = parentKey(ref);
+    if (parent) select(parent, { reveal: true });
+  }
+  return true;
 }
 
 function setFilter(next: SlotFilter) {
@@ -550,17 +726,22 @@ function setFilter(next: SlotFilter) {
   render();
 }
 
+function setProject(next: string | null) {
+  project = next;
+  writePref("projectFilter", next);
+  revealSelection = true;
+  render();
+}
+
 function setBodyOpen(open: boolean) {
   bodyOpen = open;
   app.dataset.body = open ? "open" : "hidden";
   writePref("bodyOpen", open);
+  setSheet(false);
   render();
 }
 
-function selectView(name: string) {
-  // One screen for now; the branch screen joins this tab list later
-  view = name === "slots" ? name : "slots";
-  writePref("view", view);
+function paintViewTabs() {
   document.querySelectorAll<HTMLElement>("#view-tabs [role='tab']").forEach((b) => {
     const on = b.dataset.view === view;
     b.setAttribute("aria-selected", String(on));
@@ -568,12 +749,64 @@ function selectView(name: string) {
   });
 }
 
+function selectView(next: View) {
+  if (next === view) return;
+  view = next;
+  writePref("view", view);
+  if (view !== "branches") branchFocus = null;
+  setSheet(false);
+  paintViewTabs();
+  // The branch screen reads the detailed git state: bring it when it is old
+  if (view === "branches") freshenFull();
+  render();
+}
+
+function stepView(delta: number) {
+  selectView(VIEWS[(VIEWS.indexOf(view) + delta + VIEWS.length) % VIEWS.length]);
+}
+
+/** 「이 슬롯 브랜치 보기」: the branch screen on the slot's project, its repository marked. */
+function showSlotBranches(slot: Slot) {
+  branchFocus = slot.name;
+  revealSelection = true;
+  project = groupName(slot);
+  writePref("projectFilter", project);
+  if (view === "branches") render();
+  else selectView("branches");
+}
+
+/** Shows `key` whatever the filter, the project and the find text (a press in a panel or the status bar). */
+function reveal(key: string) {
+  if (view !== "slots") selectView("slots");
+  const ref = parseKey(key);
+  const owner = projectOf(ref, doc);
+  const hidden = () => !(buildSlotList(doc!, { filter, project, find: findText, collapsed: new Set(), warned: warnedSlots(currentWarnings()) }, rowContext()).keys.includes(key));
+  if (doc && hidden()) {
+    filter = "all";
+    writePref("slotFilter", filter);
+    findText = "";
+    ($("find-input") as HTMLInputElement).value = "";
+    if (project !== null && (owner === null || owner !== project)) {
+      project = null;
+      writePref("projectFilter", null);
+    }
+  }
+  select(key, { reveal: true });
+}
+
 /** Keys that move in the list act only when the focus is on the page, the list or the details. */
 function listKeysActive(): boolean {
   if (isContextMenuOpen()) return false;
   const el = document.activeElement;
   if (!el || el === document.body) return true;
-  return el.id === "list" || (!!el.closest("#list-main, #body-main") && !el.closest("#find"));
+  return el.id === "list" || (!!el.closest("#list-main, #body-main") && !el.closest("#list-tools"));
+}
+
+/** ←/→ fold groups only when the list itself has the focus (the chips use them too). */
+function treeKeysActive(): boolean {
+  if (isContextMenuOpen() || view !== "slots") return false;
+  const el = document.activeElement;
+  return !el || el === document.body || el.id === "list";
 }
 
 // ---------------------------------------------------------------- actions
@@ -591,14 +824,20 @@ async function copyPath(path: string) {
   if (await copyText(path)) flashStatus(t("toast.copied"));
 }
 
-async function copyCleanup() {
+/** The cleanup request for everything, the project filter, a project or one slot. */
+async function copyCleanup(scope: CleanupScope = {}) {
   if (!doc) return;
-  const text = cleanupRequest(doc, now(), gitOf);
+  const text = cleanupRequest(doc, now(), gitOf, scope);
   if (!text) {
     flashStatus(t("toast.cleanupEmpty"));
     return;
   }
   if (await copyText(text)) flashStatus(t("toast.cleanupCopied"), 3500);
+}
+
+function projectScope(name: string | null): CleanupScope {
+  if (name === null) return {};
+  return { slots: new Set((projectGroups(slots()).get(name) ?? []).map((s) => s.name)), label: name };
 }
 
 function openError(code: string, target: OpenTarget): string {
@@ -688,6 +927,10 @@ async function openLog(path: string) {
   await call("open_log", { path }).catch(() => flashStatus(t("toast.notFound")));
 }
 
+async function openFolder(path: string) {
+  await call("open_folder", { path }).catch(() => flashStatus(t("toast.notFound")));
+}
+
 function slotMenu(slot: Slot): MenuEntry[] {
   const unity = unityAction(slot);
   const target = settings.openTarget;
@@ -710,9 +953,47 @@ function slotMenu(slot: Slot): MenuEntry[] {
   entries.push(
     { label: t("btn.log"), action: () => void openLog(slot.path) },
     "separator",
+    { label: t("menu.slotBranches"), action: () => showSlotBranches(slot) },
+    { label: t("menu.slotCleanup"), action: () => void copyCleanup({ slots: new Set([slot.name]), label: slot.name }) },
+    "separator",
     { label: t("btn.copyPath"), shortcut: "Ctrl+C", action: () => void copyPath(slot.path) },
   );
   return entries;
+}
+
+function groupMenu(name: string): MenuEntry[] {
+  const key = groupKey(name);
+  const folded = collapsed.has(key);
+  return [
+    { label: t(folded ? "menu.unfold" : "menu.fold"), shortcut: "Enter", action: () => toggleGroup(key) },
+    { label: t(project === name ? "group.showAll" : "group.onlyThis"), action: () => setProject(project === name ? null : name) },
+    "separator",
+    { label: t("menu.cleanupScope", { scope: name }), action: () => void copyCleanup(projectScope(name)) },
+  ];
+}
+
+function extraMenu(ref: ItemRef): MenuEntry[] {
+  if (ref.kind === "extra") return [{ label: t(collapsed.has(EXTRA_KEY) ? "menu.unfold" : "menu.fold"), action: () => toggleGroup(EXTRA_KEY) }];
+  const path = selectedPath();
+  const entries: MenuEntry[] = [];
+  if (ref.kind === "editor") entries.push({ label: t("menu.focusUnity"), action: () => focusEditor(ref.pid) }, "separator");
+  if (path) {
+    entries.push(
+      { label: t("menu.openExplorer"), action: () => void openFolder(path) },
+      { label: t("btn.copyPath"), shortcut: "Ctrl+C", action: () => void copyPath(path) },
+    );
+  }
+  return entries;
+}
+
+function itemMenu(ref: ItemRef | null): MenuEntry[] {
+  if (!ref) return [];
+  if (ref.kind === "slot") {
+    const slot = findSlot(ref.name);
+    return slot ? slotMenu(slot) : [];
+  }
+  if (ref.kind === "group") return groupMenu(ref.name);
+  return extraMenu(ref);
 }
 
 function openSettings(category?: CategoryId) {
@@ -723,12 +1004,16 @@ function onTop(): boolean {
   return settings.windowOnTop;
 }
 
+function cleanupLabel(): string {
+  return project === null ? t("menu.cleanup") : t("menu.cleanupScope", { scope: project });
+}
+
 function appMenu(): MenuEntry[] {
   return [
     { label: t("menu.refresh"), shortcut: "F5", action: () => void refresh(false) },
     { label: t("menu.refreshFull"), shortcut: "Shift+F5", action: () => void refresh(true) },
     "separator",
-    { label: t("menu.cleanup"), shortcut: "Ctrl+Shift+C", action: () => void copyCleanup() },
+    { label: cleanupLabel(), shortcut: "Ctrl+Shift+C", action: () => void copyCleanup(projectScope(project)) },
     { label: t("menu.events"), action: () => nav.show("log") },
     "separator",
     { label: t("menu.sidePanel"), checked: nav.isOpen(), shortcut: "Ctrl+Shift+E", action: () => nav.toggle() },
@@ -741,22 +1026,12 @@ function appMenu(): MenuEntry[] {
   ];
 }
 
-async function showExtraDialog() {
-  const n = now();
-  const lines = [
-    ...(doc?.unregisteredEditors ?? []).map((e) =>
-      t("extra.editorLine", {
-        pid: e.pid,
-        project: e.project ?? t("detail.none"),
-        gb: formatGb(e.memory?.totalPrivGB),
-        time: formatWhen(e.startedAt, n),
-      }),
-    ),
-    ...(doc?.orphanWorkers ?? []).map((w) =>
-      t("extra.workerLine", { pid: w.pid, owner: w.ownerPid ?? t("detail.none"), project: w.project ?? t("detail.none"), gb: formatGb(w.privGB) }),
-    ),
+function projectMenu(): MenuEntry[] {
+  return [
+    { label: t("panel.allProjects"), checked: project === null, action: () => setProject(null) },
+    "separator",
+    ...[...projectGroups(slots()).keys()].map((name): MenuEntry => ({ label: name, checked: project === name, action: () => setProject(name) })),
   ];
-  await showDialog({ title: t("extra.title"), message: t("extra.note"), detail: lines.join("\n") });
 }
 
 // ---------------------------------------------------------------- settings
@@ -824,28 +1099,20 @@ function onSettingsChanged(changed: SettingKey[], first = false) {
 
 // ---------------------------------------------------------------- events
 
-async function onActionClick(e: MouseEvent): Promise<boolean> {
+/** Buttons in the details column and the list (`data-act`). True when one was pressed. */
+function onActionClick(e: MouseEvent): boolean {
   const target = e.target as HTMLElement;
-  const action = target.closest<HTMLElement>("[data-action]");
-  if (action) {
-    e.stopPropagation();
-    const path = action.dataset.path ?? "";
-    switch (action.dataset.action) {
-      case "folder":
-        await call("open_folder", { path }).catch(() => flashStatus(t("toast.notFound")));
-        return true;
-      case "log":
-        await openLog(path);
-        return true;
-      case "copy":
-        await copyPath(path);
-        return true;
-    }
+  const pick = target.closest<HTMLElement>("[data-pick], [data-pick-item]");
+  if (pick) {
+    reveal(pick.dataset.pickItem ?? slotKey(pick.dataset.pick!));
+    return true;
   }
   const act = target.closest<HTMLElement>("[data-act]");
   if (!act) return false;
+  e.stopPropagation();
   const slot = selectedSlot();
-  switch (act.dataset.act) {
+  const data = act.dataset;
+  switch (data.act) {
     case "retry":
       void refresh(true);
       break;
@@ -867,19 +1134,45 @@ async function onActionClick(e: MouseEvent): Promise<boolean> {
     case "copy":
       if (slot) void copyPath(slot.path);
       break;
+    case "branches":
+      if (slot) showSlotBranches(slot);
+      break;
+    case "project":
+      setProject(project === data.project ? null : (data.project ?? null));
+      break;
+    case "cleanup-project":
+      void copyCleanup(projectScope(data.project ?? null));
+      break;
+    case "focus-pid":
+      if (data.pid) focusEditor(Number(data.pid));
+      break;
+    case "folder":
+      if (data.path) void openFolder(data.path);
+      break;
+    case "copy-text":
+      if (data.text) void copyPath(data.text);
+      break;
   }
   return true;
 }
 
 function onListClick(e: MouseEvent) {
-  void onActionClick(e).then((handled) => {
-    if (handled) return;
-    const target = e.target as HTMLElement;
-    // Clicks inside open details select text; they do not fold the row
-    if (target.closest(".details")) return;
-    const name = target.closest<HTMLElement>("li.slot[data-toggle]")?.dataset.toggle;
-    if (name) select(name, { toggleInline: true });
-  });
+  if (onActionClick(e)) return;
+  const target = e.target as HTMLElement;
+  const item = target.closest<HTMLElement>("[data-item]");
+  if (!item) return;
+  const key = item.dataset.item!;
+  // The chevron folds; a press elsewhere selects (and opens the details over a narrow list)
+  if (target.closest("[data-fold]")) {
+    toggleGroup(key);
+    return;
+  }
+  select(key, { open: true });
+}
+
+function onListDoubleClick(e: MouseEvent) {
+  const head = (e.target as HTMLElement).closest<HTMLElement>(".group-head[data-item]");
+  if (head && !(e.target as HTMLElement).closest("[data-fold]")) toggleGroup(head.dataset.item!);
 }
 
 function onContextMenu(e: MouseEvent) {
@@ -887,24 +1180,46 @@ function onContextMenu(e: MouseEvent) {
   // Text fields keep their own menu (paste)
   if (target.closest("input, textarea")) return;
   e.preventDefault();
-  const name = target.closest<HTMLElement>("li.slot[data-toggle]")?.dataset.toggle;
-  const slot = name ? slots().find((s) => s.name === name) : null;
-  if (!slot) return;
-  if (slot.name !== selected) select(slot.name);
-  showContextMenu(e, slotMenu(slot));
+  const key = target.closest<HTMLElement>("#list [data-item]")?.dataset.item;
+  if (!key) return;
+  if (key !== selected) select(key);
+  const entries = itemMenu(parseKey(key));
+  if (entries.length) showContextMenu(e, entries);
 }
 
 function openRowMenu(): boolean {
-  const slot = selectedSlot();
-  if (!slot || !listKeysActive()) return false;
-  const row = document.querySelector<HTMLElement>("#list-inner li.slot.selected");
+  if (!selected || !listKeysActive() || view !== "slots") return false;
+  const entries = itemMenu(selectedRef());
+  if (!entries.length) return false;
+  const row = document.querySelector<HTMLElement>("#list-inner [data-item].selected");
   const r = (row ?? $("list")).getBoundingClientRect();
-  showContextMenu({ x: r.left + 24, y: r.top + Math.min(r.height, 28) }, slotMenu(slot));
+  showContextMenu({ x: r.left + 24, y: r.top + Math.min(r.height, 28) }, entries);
+  return true;
+}
+
+function onEnter(): boolean {
+  const el = document.activeElement;
+  if (!selected || !listKeysActive() || view !== "slots" || (el && el.closest("button, a"))) return false;
+  const ref = selectedRef();
+  if (ref?.kind === "group" || ref?.kind === "extra") {
+    toggleGroup(selected);
+    return true;
+  }
+  if (sheetMode()) {
+    setSheet(true);
+    renderBody();
+  }
+  $("body-main").focus();
   return true;
 }
 
 function onEscape(): boolean {
   if (isContextMenuOpen()) return false;
+  if (sheetOpen) {
+    setSheet(false);
+    $("list").focus();
+    return true;
+  }
   const input = $("find-input") as HTMLInputElement;
   if (document.activeElement === input || findText) {
     input.value = "";
@@ -920,10 +1235,25 @@ function onEscape(): boolean {
   return false;
 }
 
+function showExtra() {
+  if (!doc?.unregisteredEditors?.length && !doc?.orphanWorkers?.length) return;
+  if (collapsed.delete(EXTRA_KEY)) saveCollapsed();
+  if (project !== null) {
+    project = null;
+    writePref("projectFilter", null);
+  }
+  reveal(EXTRA_KEY);
+}
+
 function bindEvents() {
   $("list").addEventListener("click", onListClick);
+  $("list").addEventListener("dblclick", onListDoubleClick);
   $("body-main").addEventListener("click", (e) => void onActionClick(e));
   document.addEventListener("contextmenu", onContextMenu);
+  $("sheet-back").addEventListener("click", () => {
+    setSheet(false);
+    $("list").focus();
+  });
 
   $("find-input").addEventListener("input", (e) => {
     findText = (e.target as HTMLInputElement).value;
@@ -937,32 +1267,41 @@ function bindEvents() {
   $("filter-chips").addEventListener("keydown", (e) => {
     if (e.key !== "ArrowLeft" && e.key !== "ArrowRight") return;
     e.preventDefault();
-    const step = e.key === "ArrowRight" ? 1 : FILTERS.length - 1;
-    const next = FILTERS[(FILTERS.indexOf(filter) + step) % FILTERS.length];
+    const step = e.key === "ArrowRight" ? 1 : SLOT_FILTERS.length - 1;
+    const next = SLOT_FILTERS[(SLOT_FILTERS.indexOf(filter) + step) % SLOT_FILTERS.length];
     setFilter(next);
     document.querySelector<HTMLElement>(`#filter-chips [data-filter="${next}"]`)?.focus();
   });
+  $("project-btn").addEventListener("click", (e) => {
+    const button = e.currentTarget as HTMLElement;
+    if (isContextMenuOpen()) hideContextMenu();
+    else showMenuBelow(button, projectMenu());
+  });
   $("view-tabs").addEventListener("click", (e) => {
     const value = (e.target as HTMLElement).closest<HTMLElement>("[data-view]")?.dataset.view;
-    if (value) selectView(value);
+    if (isView(value)) selectView(value);
+  });
+  // Roving tab index over the screen tabs, as the side panel's tabs do
+  $("view-tabs").addEventListener("keydown", (e) => {
+    if (e.key !== "ArrowLeft" && e.key !== "ArrowRight") return;
+    e.preventDefault();
+    stepView(e.key === "ArrowRight" ? 1 : -1);
+    document.querySelector<HTMLElement>(`#view-tabs [data-view="${view}"]`)?.focus();
   });
 
   $("projects-body").addEventListener("click", (e) => {
-    const group = (e.target as HTMLElement).closest<HTMLElement>("[data-group]")?.dataset.group;
-    if (!group) return;
-    document.querySelector(`#list-inner section.group[data-group="${CSS.escape(group)}"]`)?.scrollIntoView({ block: "start" });
+    const target = e.target as HTMLElement;
+    if (target.closest("[data-extra]")) {
+      showExtra();
+      return;
+    }
+    const row = target.closest<HTMLElement>("[data-project]");
+    if (row) setProject(row.dataset.project || null);
   });
   const pickSlot = (e: Event) => {
     const name = (e.target as HTMLElement).closest<HTMLElement>("[data-slot]")?.dataset.slot;
-    if (!name || !slots().some((s) => s.name === name)) return;
-    // A filter or the find text may hide it: show everything
-    if (!visibleSlots().some((s) => s.name === name)) {
-      filter = "all";
-      writePref("slotFilter", filter);
-      findText = "";
-      ($("find-input") as HTMLInputElement).value = "";
-    }
-    select(name, { reveal: true });
+    if (!name || !findSlot(name)) return;
+    reveal(slotKey(name));
   };
   $("warnings-body").addEventListener("click", pickSlot);
   $("log-body").addEventListener("click", pickSlot);
@@ -977,11 +1316,15 @@ function bindEvents() {
   $("settings-btn").addEventListener("click", () => openSettings());
 
   $("status-path").addEventListener("click", () => {
-    const slot = selectedSlot();
-    if (slot) void copyPath(slot.path);
+    const path = selectedPath();
+    if (path) void copyPath(path);
   });
   $("status-warnings").addEventListener("click", () => nav.show("warnings"));
-  $("status-editors").addEventListener("click", () => setFilter(filter === "open" ? "all" : "open"));
+  $("status-editors").addEventListener("click", () => {
+    const next = filter === "open" && view === "slots" ? "all" : "open";
+    if (view !== "slots") selectView("slots");
+    setFilter(next);
+  });
   $("status-updated").addEventListener("click", (e) =>
     showMenuAbove(e.currentTarget as HTMLElement, [
       { label: t("menu.refresh"), shortcut: "F5", action: () => void refresh(false) },
@@ -989,16 +1332,18 @@ function bindEvents() {
     ]),
   );
   $("status-git").addEventListener("click", () => void refresh(true));
-  $("status-extra").addEventListener("click", () => void showExtraDialog());
+  $("status-extra").addEventListener("click", showExtra);
   $("status-core").addEventListener("click", () => openSettings("core"));
 
   setBannerFocusHome(() => $("list").focus());
   initBodyResize({ fold: () => setBodyOpen(false) });
 
+  const inList = (fn: () => void) => () => listKeysActive() && view === "slots" && (fn(), true);
   initKeys([
     { keys: "Ctrl+1", run: () => selectView("slots") },
-    { keys: "Ctrl+Tab", run: () => selectView(view) },
-    { keys: "Ctrl+Shift+Tab", run: () => selectView(view) },
+    { keys: "Ctrl+2", run: () => selectView("branches") },
+    { keys: "Ctrl+Tab", run: () => stepView(1) },
+    { keys: "Ctrl+Shift+Tab", run: () => stepView(-1) },
     { keys: "Ctrl+Shift+E", run: () => nav.toggle(), inFields: true },
     { keys: "Ctrl+\\", run: () => setBodyOpen(!bodyOpen), inFields: true },
     {
@@ -1011,29 +1356,22 @@ function bindEvents() {
       },
     },
     { keys: "Escape", run: onEscape, inFields: true },
-    { keys: "ArrowDown", run: () => listKeysActive() && (moveSelection("next"), true) },
-    { keys: "ArrowUp", run: () => listKeysActive() && (moveSelection("prev"), true) },
-    { keys: "Home", run: () => listKeysActive() && (moveSelection("first"), true) },
-    { keys: "End", run: () => listKeysActive() && (moveSelection("last"), true) },
-    {
-      keys: "Enter",
-      run: () => {
-        const el = document.activeElement;
-        if (!selected || !listKeysActive() || (el && el.closest("button, a"))) return false;
-        if (bodyShown()) $("body-main").focus();
-        else select(selected, { toggleInline: true });
-        return true;
-      },
-    },
+    { keys: "ArrowDown", run: inList(() => moveSelection("next")) },
+    { keys: "ArrowUp", run: inList(() => moveSelection("prev")) },
+    { keys: "Home", run: inList(() => moveSelection("first")) },
+    { keys: "End", run: inList(() => moveSelection("last")) },
+    { keys: "ArrowLeft", run: () => treeKeysActive() && stepTree(false) },
+    { keys: "ArrowRight", run: () => treeKeysActive() && stepTree(true) },
+    { keys: "Enter", run: onEnter },
     { keys: "Shift+F10", run: openRowMenu },
     { keys: "ContextMenu", run: openRowMenu },
     {
       keys: "Ctrl+C",
       run: () => {
-        const slot = selectedSlot();
+        const path = selectedPath();
         // Selected text copies as usual
-        if (!slot || (window.getSelection()?.toString() ?? "") !== "") return false;
-        void copyPath(slot.path);
+        if (!path || (window.getSelection()?.toString() ?? "") !== "") return false;
+        void copyPath(path);
       },
     },
     {
@@ -1043,14 +1381,18 @@ function bindEvents() {
         if (slot) void openSlot(slot, settings.openTarget);
       },
     },
-    { keys: "Ctrl+Shift+C", run: () => void copyCleanup(), inFields: true },
+    { keys: "Ctrl+Shift+C", run: () => void copyCleanup(projectScope(project)), inFields: true },
     { keys: "F5", run: () => void refresh(false), inFields: true },
     { keys: "Shift+F5", run: () => void refresh(true), inFields: true },
     { keys: "Ctrl+,", run: () => openSettings(), inFields: true },
     { keys: "Ctrl+Shift+D", run: () => void toggleTheme(), inFields: true },
   ]);
 
-  const onWidth = () => render();
+  const onWidth = () => {
+    // The details column came back: what was over the list goes
+    if (!sheetMode()) setSheet(false);
+    render();
+  };
   overlayQuery.addEventListener("change", onWidth);
   narrowQuery.addEventListener("change", onWidth);
   window.addEventListener("resize", fitStatusbar);
@@ -1062,12 +1404,17 @@ function bindEvents() {
 function applyPreviewQuery() {
   const query = new URLSearchParams(location.search);
   const pick = query.get("select");
-  if (pick !== null) selected = pick || null;
+  if (pick !== null) selected = pick ? (/^[sgxew]:/.test(pick) ? pick : slotKey(pick)) : null;
   const tab = query.get("nav");
   if (tab === "closed") nav.setOpen(false);
   else if (tab) nav.show(tab);
-  if (query.get("view")) view = query.get("view")!;
+  const v = query.get("view");
+  if (isView(v)) view = v;
+  if (query.has("project")) project = query.get("project") || null;
+  const f = query.get("filter");
+  if (isFilter(f)) filter = f;
   if (query.get("body") === "hidden") bodyOpen = false;
+  if (query.get("sheet") === "open") sheetOpen = true;
   // ?frame=1200x760 draws the window at that size whatever the browser window is
   const frame = /^(\d+)x(\d+)$/.exec(query.get("frame") ?? "");
   if (frame) {
@@ -1087,7 +1434,8 @@ function afterPaint(): Promise<void> {
 async function boot() {
   if (!inTauri) applyPreviewQuery();
   app.dataset.body = bodyOpen ? "open" : "hidden";
-  selectView(view);
+  setSheet(sheetOpen);
+  paintViewTabs();
   receiveSettings(await call<WidgetSettings>("get_settings").catch(() => null));
   appInfo = await call<AppInfo>("get_app_info").catch(() => null);
   addSettingsPanels();
