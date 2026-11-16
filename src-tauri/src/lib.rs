@@ -10,7 +10,7 @@ mod tray;
 
 use appwindow::MAIN_LABEL;
 use settings::WidgetSettings;
-use tauri::{Manager, WindowEvent};
+use tauri::{Emitter, Manager, WindowEvent};
 use tauri_plugin_window_state::StateFlags;
 
 #[tauri::command]
@@ -95,6 +95,30 @@ async fn open_in_unity(path: String) -> Result<core::OpenResult, String> {
         .map_err(|e| e.to_string())?
 }
 
+/// The view repository of a project (core 0.7.0 `branch-view`): a plan without `apply`, else make or
+/// refresh it. Only a person's press calls this. While sample data is shown it does nothing (the
+/// sample's projects are not this PC's). A run that outlasts the time limit is not killed; its result
+/// comes later as the event `branch-view-finished` ({ project, apply, result | error }).
+#[tauri::command]
+async fn branch_view(app: tauri::AppHandle, project: String, apply: bool) -> Result<core::BranchViewResult, String> {
+    let s = settings::load();
+    if settings::sample_source(&s).is_some() {
+        return Err("sample".into());
+    }
+    let late_project = project.clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        core::branch_view(&s.unity_slot_script, &project, apply, move |outcome| {
+            let payload = match outcome {
+                Ok(result) => serde_json::json!({ "project": late_project, "apply": apply, "result": result }),
+                Err(error) => serde_json::json!({ "project": late_project, "apply": apply, "error": error }),
+            };
+            let _ = app.emit_to(MAIN_LABEL, "branch-view-finished", payload);
+        })
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
 /// A slot card's right-click > Show Unity window, for an editor that is already open.
 #[tauri::command]
 fn focus_editor(pid: u32) -> Result<(), String> {
@@ -165,6 +189,7 @@ pub fn run() {
             open_log,
             open_with,
             open_in_unity,
+            branch_view,
             focus_editor,
             set_tray_labels,
             set_glance,

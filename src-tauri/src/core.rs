@@ -1,5 +1,7 @@
-//! Runs `unity-slot dashboard -Json` and hands the document to the page as it is, and runs
-//! `unity-slot open <slot> -NoWait` for a slot card's right-click > Open in Unity.
+//! Runs `unity-slot dashboard -Json` and hands the document to the page as it is, runs
+//! `unity-slot open <slot> -NoWait` for a slot card's right-click > Open in Unity, and runs
+//! `unity-slot branch-view -Project <p> -Json [-Apply]` when a person asks for the view repository
+//! (core 0.7.0: a bare repository whose remotes are the slots; the core only reads the slots).
 //!
 //! The widget never decides anything about slots: the core owns the rules and the schema
 //! (`unity-slot.dashboard/1`). This file only finds the core, runs it in a hidden window with a
@@ -33,6 +35,15 @@ const OPEN_TIMEOUT: Duration = Duration::from_secs(90);
 /// One open at a time. Held until the core's process ends, even after the widget stopped waiting,
 /// so a second click cannot start a second editor while the first run is still launching one.
 static OPENING: AtomicBool = AtomicBool::new(false);
+
+/// `branch-view` makes or refreshes a view repository; a first run copies a slot's objects and can
+/// take minutes. After this long the page gets `timeout` and the run goes on: it is never killed,
+/// and its result arrives later (`on_late`).
+const BRANCH_VIEW_TIMEOUT: Duration = Duration::from_secs(180);
+const BRANCH_VIEW_SCHEMA_PREFIX: &str = "unity-slot.branch-view/";
+
+/// One branch-view run at a time, held until the core's process ends (like OPENING).
+static BRANCH_VIEW: AtomicBool = AtomicBool::new(false);
 
 #[derive(serde::Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -269,6 +280,107 @@ fn open_outcome(code: i32, stdout: &str, stderr: &str) -> Result<OpenResult, Str
     Err(format!("exit:{code}:{}", short(&text)))
 }
 
+#[derive(Debug, PartialEq, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct BranchViewResult {
+    /// The `unity-slot.branch-view/1` document as the core wrote it.
+    pub document: serde_json::Value,
+    /// 0 ok, 1 a view failed (listed in the document), 4 another run holds a view's lock.
+    pub exit_code: i32,
+}
+
+/// `unity-slot branch-view -Project <project> -Json [-Apply]`, run because a person pressed a button.
+/// Without `apply` it only plans (writes nothing). The slots are only read, and only by the core.
+/// Errors: `busy` (a run started here is still going), `core-not-found`, `bad-project`,
+/// `spawn:<text>`, `timeout` (the run goes on and `on_late` gets its result), `parse:<text>`,
+/// `exit:<code>:<text>` (no document: for example an older core that has no branch-view).
+pub fn branch_view<F>(setting_script: &str, project: &str, apply: bool, on_late: F) -> Result<BranchViewResult, String>
+where
+    F: FnOnce(Result<BranchViewResult, String>) + Send + 'static,
+{
+    let project = project.trim();
+    // One project, and never something PowerShell would read as a parameter or a list
+    if project.is_empty() || project.starts_with('-') || project.contains(',') || project.chars().any(char::is_control) {
+        return Err("bad-project".into());
+    }
+    let location = paths::locate_core(setting_script);
+    let script = location.script.ok_or_else(|| "core-not-found".to_string())?;
+    if BRANCH_VIEW.swap(true, Ordering::AcqRel) {
+        return Err("busy".into());
+    }
+    let mut args = vec!["branch-view", "-Project", project, "-Json"];
+    if apply {
+        args.push("-Apply");
+    }
+    let CoreRun { mut child, out_reader, err_reader } = match start_core(&script, &args, true) {
+        Ok(run) => run,
+        Err(e) => {
+            BRANCH_VIEW.store(false, Ordering::Release);
+            return Err(e);
+        }
+    };
+
+    let deadline = Instant::now() + BRANCH_VIEW_TIMEOUT;
+    let status = loop {
+        match child.try_wait() {
+            Ok(Some(status)) => break status,
+            Ok(None) if Instant::now() >= deadline => {
+                // Never killed: it may be in the middle of writing the view. Wait for it here and
+                // hand its result over when it ends.
+                std::thread::spawn(move || {
+                    let code = child.wait().ok().and_then(|s| s.code()).unwrap_or(-1);
+                    let out = out_reader.join().unwrap_or_default();
+                    let err = err_reader.join().unwrap_or_default();
+                    BRANCH_VIEW.store(false, Ordering::Release);
+                    on_late(branch_view_outcome(code, &String::from_utf8_lossy(&out), &String::from_utf8_lossy(&err)));
+                });
+                return Err("timeout".into());
+            }
+            Ok(None) => std::thread::sleep(Duration::from_millis(100)),
+            Err(e) => {
+                // try_wait failed: wait for the end anyway before the next run may start
+                std::thread::spawn(move || {
+                    let _ = child.wait();
+                    let _ = out_reader.join();
+                    let _ = err_reader.join();
+                    BRANCH_VIEW.store(false, Ordering::Release);
+                });
+                return Err(format!("spawn:{e}"));
+            }
+        }
+    };
+    let out = out_reader.join().unwrap_or_default();
+    let err = err_reader.join().unwrap_or_default();
+    BRANCH_VIEW.store(false, Ordering::Release);
+    branch_view_outcome(status.code().unwrap_or(-1), &String::from_utf8_lossy(&out), &String::from_utf8_lossy(&err))
+}
+
+/// The document on stdout whatever the exit code (a failed view is in it); without one, the core's
+/// `ERROR` line (stdout or stderr), else the first stderr line.
+fn branch_view_outcome(code: i32, stdout: &str, stderr: &str) -> Result<BranchViewResult, String> {
+    let text = stdout.trim_start_matches('\u{feff}');
+    if let Some(start) = text.find('{') {
+        let value: serde_json::Value = serde_json::from_str(text[start..].trim_end()).map_err(|e| format!("parse:{e}"))?;
+        let schema = value.get("schema").and_then(|s| s.as_str()).unwrap_or("");
+        if !schema.starts_with(BRANCH_VIEW_SCHEMA_PREFIX) {
+            return Err(format!("parse:schema {schema}"));
+        }
+        return Ok(BranchViewResult { document: value, exit_code: code });
+    }
+    let error_line = |s: &str| {
+        s.lines()
+            .map(str::trim)
+            .map(|l| l.strip_prefix("[branch-view]").map(str::trim_start).unwrap_or(l))
+            .find_map(|l| l.strip_prefix("ERROR:").map(|rest| rest.trim().to_string()))
+    };
+    let message = error_line(stdout)
+        .or_else(|| error_line(stderr))
+        .or_else(|| stderr.lines().map(str::trim).find(|l| !l.is_empty()).map(str::to_string))
+        .or_else(|| stdout.lines().map(str::trim).find(|l| !l.is_empty()).map(str::to_string))
+        .unwrap_or_default();
+    Err(format!("exit:{code}:{}", short(&message)))
+}
+
 fn pid_after(line: &str, prefix: &str) -> Option<u32> {
     line.strip_prefix(prefix)?.split(|c: char| !c.is_ascii_digit()).next()?.parse().ok()
 }
@@ -322,5 +434,33 @@ mod tests {
             Err(r"exit:1:not a Unity project (Assets and ProjectSettings expected): C:\slots\x".to_string())
         );
         assert_eq!(open_outcome(1, "", "boom\n"), Err("exit:1:boom".to_string()));
+    }
+
+    #[test]
+    fn branch_view_document_whatever_the_exit_code() {
+        let doc = r#"{"schema":"unity-slot.branch-view/1","version":"0.7.0","apply":false,"root":"D:\\v","views":[{"project":"me/mygame","exists":false,"action":"create","estimatedBytes":600000000}]}"#;
+        let r = branch_view_outcome(0, &format!("\u{feff}{doc}\n"), "[branch-view] root    D:\\v (dry run)\n").unwrap();
+        assert_eq!(r.exit_code, 0);
+        assert_eq!(r.document["views"][0]["action"], "create");
+        // A view that failed or was busy is in the document; the exit code says so
+        assert_eq!(branch_view_outcome(4, doc, "").unwrap().exit_code, 4);
+    }
+
+    #[test]
+    fn branch_view_without_a_document() {
+        let old = "ERROR: unknown command 'branch-view'. See: unity-slot help\n";
+        assert_eq!(branch_view_outcome(1, old, ""), Err("exit:1:unknown command 'branch-view'. See: unity-slot help".to_string()));
+        let err = "[branch-view] ERROR no registered slot matches -Project x\n";
+        assert_eq!(branch_view_outcome(1, "", err), Err("exit:1:[branch-view] ERROR no registered slot matches -Project x".to_string()));
+        assert_eq!(branch_view_outcome(1, "", "ERROR: boom\n"), Err("exit:1:boom".to_string()));
+        assert!(branch_view_outcome(0, r#"{"schema":"unity-slot.dashboard/1"}"#, "").unwrap_err().starts_with("parse:schema"));
+    }
+
+    #[test]
+    fn branch_view_refuses_odd_projects_before_running_anything() {
+        let never = |_: Result<BranchViewResult, String>| panic!("must not run");
+        for bad in ["", "  ", "-Apply", "a,b", "a\nb"] {
+            assert_eq!(branch_view("", bad, false, never), Err("bad-project".to_string()), "{bad:?}");
+        }
     }
 }
