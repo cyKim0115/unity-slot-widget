@@ -17,7 +17,15 @@
  *   batchmode slot; on an open slot it becomes Show Unity window (brings it to the front).
  *   There is no shortcut for it: starting an editor by accident costs a lot of memory.
  * - Open: the folder in another program (Fork by default). Show in Explorer. Log. Copy path.
- * - This slot's branches (the branch screen), this slot's cleanup request.
+ * - This slot's branches (the branch screen, only what the slot has), this slot's cleanup request.
+ *
+ * The branch screen (src/screens/branches.ts, core 0.7.0 `repos[]`; src/branches.ts judges): per
+ * project the repository row, branches by name across the clones (most serious first, filters
+ * 「주의」·체크아웃·전체), changes in progress and stashes, with its own selection and folded heads.
+ * Its menus only read, copy and open. The one button that writes runs the core's `branch-view`
+ * (a view repository whose remotes are the slots; the core only reads the slots): a person presses
+ * it, a new one is planned first and confirmed, then it is made or refreshed and opened in Fork.
+ * With a core before 0.7.0 it shows each repository's counts and says 0.7.0 is needed.
  *
  * Refresh rhythm
  * - full check (`dashboard -Json -Git basic`): every `idleSecs`, every `startingSecs` while an
@@ -36,10 +44,13 @@ import { applyDomTexts, currentLang, formatClock, formatDuration, formatWhen, re
 import { glance, newRisks } from "./glance";
 import {
   cleanupRequest,
+  detachedName,
   elapsedSince,
+  fullRepos,
   groupName,
   isOpen,
   mergeGit,
+  mergeRepos,
   nowFor,
   projectGroups,
   sharedRepos,
@@ -50,10 +61,47 @@ import {
   type Urgent,
   type Warning,
 } from "./model";
+import {
+  BRANCH_FILTERS,
+  branchCleanupRequest,
+  branchCounts,
+  buildProjects,
+  viewRef,
+  type BranchFilter,
+  type ProjectBranches,
+} from "./branches";
 import { logPanel } from "./panels/log";
 import { projectsPanel } from "./panels/projects";
 import { warningsPanel } from "./panels/warnings";
-import { branchesNote, branchesPlaceholder, branchesTabLabel } from "./screens/branches";
+import {
+  bBranchKey,
+  bRepoKey,
+  branchBody,
+  branchesTabLabel,
+  branchHome,
+  branchItemTitle,
+  branchListHtml,
+  branchParentKey,
+  buildBranchList,
+  changeBody,
+  hasBranchViews,
+  hasRepos,
+  isBranchFoldKey,
+  isBranchKey,
+  oldCoreBody,
+  oldCoreList,
+  parseBranchKey,
+  projectBody,
+  repoBody,
+  stashBody,
+  subgroupBody,
+  viewLine,
+  type BranchContext,
+  type BranchListView,
+  type ProjectView,
+  type ViewAction,
+} from "./screens/branches";
+import { showDialog } from "./shell/dialog";
 import {
   buildSlotList,
   EXTRA_KEY,
@@ -93,8 +141,20 @@ import {
   type SettingKey,
 } from "./settings";
 import { aboutPanel, autostartPanel, branchViewPanel, corePanel } from "./settings-panels";
-import type { AppInfo, Dashboard, DashboardResult, GitState, OpenResult, OpenTarget, Slot, WidgetSettings } from "./types";
-import { SUPPORTED_SCHEMA_MAJOR } from "./types";
+import type {
+  AppInfo,
+  BranchViewPlan,
+  BranchViewResult,
+  Dashboard,
+  DashboardResult,
+  GitState,
+  OpenResult,
+  OpenTarget,
+  RepoGit,
+  Slot,
+  WidgetSettings,
+} from "./types";
+import { OPEN_TARGETS, SUPPORTED_SCHEMA_MAJOR } from "./types";
 import { bodyMessage, esc, nameHtml, type RowContext } from "./view";
 
 const STARTING_CAP_MS = 5 * 60_000;
@@ -104,6 +164,7 @@ type View = "slots" | "branches";
 const VIEWS: readonly View[] = ["slots", "branches"];
 const isView = (v: unknown): v is View => VIEWS.includes(v as View);
 const isFilter = (v: unknown): v is SlotFilter => SLOT_FILTERS.includes(v as SlotFilter);
+const isBranchFilter = (v: unknown): v is BranchFilter => BRANCH_FILTERS.includes(v as BranchFilter);
 const isStringOrNull = (v: unknown): v is string | null => v === null || typeof v === "string";
 const isStringList = (v: unknown): v is string[] => Array.isArray(v) && v.every((x) => typeof x === "string");
 
@@ -115,7 +176,11 @@ let receivedAt = 0;
 let lastResult: DashboardResult | null = null;
 let lastError: string | null = null;
 const fullGit = new Map<string, GitState>();
+/** The last full answer per git directory (core 0.7.0 `repos[]`), by repoKey. */
+let fullRepoMap = new Map<string, RepoGit>();
 let lastFullAt = 0;
+/** The core's time on the last full answer (the branch screen's 「마지막 자세한 git」). */
+let lastFullDocTime: string | null = null;
 
 let running = false;
 let pending: { full: boolean } | null = null;
@@ -142,10 +207,24 @@ let findText = "";
 let sheetOpen = false;
 /** Scroll the selected row into view after the next list paint (the restored one, the first time). */
 let revealSelection = true;
-/** The slot whose repository the branch screen marks (「이 슬롯 브랜치 보기」). */
-let branchFocus: string | null = null;
 /** What the list shows now: its item keys are the keyboard order. */
 let listView: SlotListView | null = null;
+
+/** The branch screen (screens/branches.ts): its own selection, folded heads and filter. */
+let branchSelected: string | null = readPref("branchSelected", null, isStringOrNull);
+let branchCollapsed = new Set<string>(readPref("branchCollapsed", [], isStringList));
+let branchFilter: BranchFilter = readPref("branchFilter", "attention", isBranchFilter);
+/** 「이 슬롯 브랜치 보기」: only what this slot has, until the branch screen is left. */
+let branchSlot: string | null = null;
+let branchList: BranchListView | null = null;
+/** The branch data of the last render (core 0.7.0), or null for an older core. */
+let branchData: ProjectBranches[] | null = null;
+/** Preview only (?branch=<name>): select that branch once the data is there. */
+let pendingBranchName: string | null = null;
+
+/** The view repository run going on now (project group and registry project), and failures by project. */
+let bvRunning: { project: string; registry: string } | null = null;
+const bvErrors = new Map<string, string>();
 
 // A selection saved as a bare slot name by an older version
 if (selected && !/^[sgxew]:/.test(selected)) selected = slotKey(selected);
@@ -206,12 +285,36 @@ function setSheet(open: boolean) {
   app.dataset.sheet = sheetOpen ? "open" : "closed";
 }
 
+/** Core 0.7.0 `repos[]` with the last full answer kept per git directory; null for an older core. */
+function currentRepos(): RepoGit[] | null {
+  return doc ? mergeRepos(doc.repos, fullRepoMap) : null;
+}
+
 function currentWarnings(): Warning[] | null {
-  return doc ? warnings(doc, settings, now(), gitOf) : null;
+  return doc ? warnings(doc, settings, now(), gitOf, currentRepos()) : null;
 }
 
 function rowContext(): RowContext {
-  return { now: now(), settings, gitOf, shared: sharedRepos(slots(), gitOf), events: doc?.recentEvents ?? [] };
+  return { now: now(), settings, gitOf, shared: sharedRepos(slots(), gitOf), events: doc?.recentEvents ?? [], repos: currentRepos() };
+}
+
+/** The branch screen's data, once per render (it reads the settings' thresholds and the time). */
+function computeBranches() {
+  branchData = doc && hasRepos(doc) ? buildProjects(doc, currentRepos(), gitOf, settings, now()) : null;
+}
+
+function findProject(name: string | null | undefined): ProjectBranches | null {
+  return (name && branchData?.find((p) => p.project === name)) || null;
+}
+
+function branchContext(): BranchContext {
+  return {
+    ...rowContext(),
+    lastFullAt: lastFullDocTime,
+    viewAction,
+    viewError: (p) => bvErrors.get(p) ?? null,
+    viewRunning: (p) => bvRunning?.project === p,
+  };
 }
 
 // ---------------------------------------------------------------- refresh
@@ -266,6 +369,8 @@ async function refresh(forceFull: boolean) {
       lastFullAt = Date.now();
       fullGit.clear();
       for (const s of doc.slots ?? []) if (s.git?.level === "full") fullGit.set(s.name, s.git);
+      fullRepoMap = fullRepos(doc);
+      lastFullDocTime = doc.time ?? new Date().toISOString();
     }
   } catch (e) {
     const code = String(e);
@@ -346,6 +451,12 @@ function errorText(code: string): string {
 function render() {
   // A saved project that is no longer registered shows every project (the saved value stays)
   if (doc && project !== null && !projectGroups(slots()).has(project)) project = null;
+  computeBranches();
+  if (pendingBranchName && branchData) {
+    const hit = branchData.flatMap((p) => p.groups).find((g) => g.name === pendingBranchName);
+    if (hit) branchSelected = bBranchKey(hit.project, hit.name);
+    pendingBranchName = null;
+  }
   renderList();
   renderBody();
   renderPanels();
@@ -359,7 +470,7 @@ function errorMessage(): string {
 
 function renderTools() {
   $("view-slots").textContent = t("view.slots", { n: slots().length });
-  $("view-branches").textContent = branchesTabLabel(doc);
+  $("view-branches").textContent = branchesTabLabel(doc, branchData ? branchCounts(branchData) : null);
   document.querySelectorAll<HTMLElement>("#filter-chips [data-filter]").forEach((b) => {
     const on = b.dataset.filter === filter;
     b.setAttribute("aria-checked", String(on));
@@ -368,6 +479,22 @@ function renderTools() {
   });
   // The slot filter belongs to the slot screen; the branch screen brings its own
   $("filter-chips").hidden = view !== "slots";
+  const branchesOn = view === "branches" && hasRepos(doc);
+  $("branch-chips").hidden = !branchesOn;
+  document.querySelectorAll<HTMLElement>("#branch-chips [data-bfilter]").forEach((b) => {
+    const on = b.dataset.bfilter === branchFilter;
+    b.setAttribute("aria-checked", String(on));
+    b.tabIndex = on ? 0 : -1;
+  });
+  const hidden = $("branch-hidden");
+  const hiddenCount = branchList?.hidden ?? 0;
+  hidden.hidden = !branchesOn || hiddenCount === 0 || branchFilter === "all";
+  hidden.textContent = t(branchFilter === "attention" ? "branches.hiddenClean" : "branches.hidden", { n: hiddenCount });
+  hidden.title = t("branches.hiddenTitle");
+  const slotChip = $("branch-slot");
+  slotChip.hidden = !branchesOn || branchSlot === null;
+  slotChip.textContent = t("branches.slotFilter", { slot: branchSlot ?? "" });
+  slotChip.title = t("branches.slotFilterTitle");
   const pick = $("project-btn");
   pick.querySelector(".pick-label")!.textContent = project ?? t("panel.allProjects");
   pick.classList.toggle("on", project !== null);
@@ -375,12 +502,33 @@ function renderTools() {
 }
 
 function renderList() {
+  paintList();
+  // After the list: the tools show what it hid
   renderTools();
+}
+
+/** Ids for aria-activedescendant and the selection mark; scrolls the selection into view when asked. */
+function markSelection(inner: HTMLElement, list: HTMLElement, key: string | null) {
+  inner.querySelectorAll<HTMLElement>("[data-item]").forEach((el, i) => {
+    el.id = `item-${i}`;
+    const on = el.dataset.item === key;
+    el.classList.toggle("selected", on);
+    el.setAttribute("aria-selected", String(on));
+    if (on) {
+      list.setAttribute("aria-activedescendant", el.id);
+      if (revealSelection) el.scrollIntoView({ block: "nearest" });
+    }
+  });
+  revealSelection = false;
+}
+
+function paintList() {
   const inner = $("list-inner");
   const list = $("list");
   list.removeAttribute("aria-activedescendant");
   if (!doc) {
     listView = null;
+    branchList = null;
     // Without a document the details column carries the message; in a narrow window, the list
     inner.innerHTML = lastError
       ? bodyShown()
@@ -391,13 +539,25 @@ function renderList() {
   }
   if (view === "branches") {
     listView = null;
-    list.setAttribute("role", "region");
+    if (!branchData) {
+      // A core before 0.7.0: counts per repository, no names
+      branchList = null;
+      list.setAttribute("role", "region");
+      list.setAttribute("aria-label", t("view.branchesLabel"));
+      inner.innerHTML = oldCoreList(doc, project, rowContext());
+      revealSelection = false;
+      return;
+    }
+    list.setAttribute("role", "tree");
     list.setAttribute("aria-label", t("view.branchesLabel"));
-    inner.innerHTML = branchesPlaceholder(doc, project, rowContext(), branchFocus);
-    if (revealSelection) inner.querySelector(".repo-row.focus")?.scrollIntoView({ block: "nearest" });
-    revealSelection = false;
+    branchList = buildBranchList(branchData, { filter: branchFilter, project, slot: branchSlot, find: findText, collapsed: branchCollapsed });
+    if (!slots().length) inner.innerHTML = `<p class="empty">${esc(t("empty.noSlots"))}</p>`;
+    else if (!branchList.keys.length) inner.innerHTML = `<p class="empty">${esc(t("list.noMatch"))}</p>`;
+    else inner.innerHTML = branchListHtml(branchList, branchContext());
+    markSelection(inner, list, branchSelected);
     return;
   }
+  branchList = null;
   list.setAttribute("role", "tree");
   list.setAttribute("aria-label", t("list.label"));
   const ctx = rowContext();
@@ -409,18 +569,7 @@ function renderList() {
   if (!slots().length && !listView.extra) inner.innerHTML = `<p class="empty">${esc(t("empty.noSlots"))}</p>`;
   else if (!listView.keys.length) inner.innerHTML = `<p class="empty">${esc(t("list.noMatch"))}</p>`;
   else inner.innerHTML = slotListHtml(listView, ctx);
-  // Ids for aria-activedescendant and the selection mark
-  inner.querySelectorAll<HTMLElement>("[data-item]").forEach((el, i) => {
-    el.id = `item-${i}`;
-    const on = el.dataset.item === selected;
-    el.classList.toggle("selected", on);
-    el.setAttribute("aria-selected", String(on));
-    if (on) {
-      list.setAttribute("aria-activedescendant", el.id);
-      if (revealSelection) el.scrollIntoView({ block: "nearest" });
-    }
-  });
-  revealSelection = false;
+  markSelection(inner, list, selected);
 }
 
 function unityButton(slot: Slot): UnityButton {
@@ -443,9 +592,63 @@ function itemTitle(ref: ItemRef | null): string {
   }
 }
 
+/** A project as the list would show it unfiltered (a selection the filter hides still has its details). */
+function projectViewOf(pb: ProjectBranches): ProjectView {
+  return (
+    branchList?.projects.find((p) => p.pb.project === pb.project) ?? {
+      pb,
+      key: pb.project,
+      collapsed: false,
+      shown: pb.groups,
+      hidden: 0,
+      changes: pb.changes,
+      changesCollapsed: false,
+      stashes: pb.stashes,
+      stashesCollapsed: false,
+    }
+  );
+}
+
+function branchBodyContent(): string {
+  if (!branchData) return oldCoreBody(doc);
+  const ref = parseBranchKey(branchSelected);
+  const pb = findProject(ref?.project);
+  if (ref && pb) {
+    const ctx = branchContext();
+    const pv = projectViewOf(pb);
+    switch (ref.kind) {
+      case "project":
+        return projectBody(pv, ctx, project === pb.project);
+      case "repo":
+        return repoBody(pv, ctx);
+      case "branch": {
+        const g = pb.groups.find((x) => x.name === ref.name);
+        if (g) return branchBody(g, pb, ctx);
+        break;
+      }
+      case "changes":
+        return subgroupBody(pv, "changes", ctx);
+      case "stashes":
+        return subgroupBody(pv, "stashes", ctx);
+      case "change": {
+        const item = pb.changes.find((c) => c.slot.name === ref.slot);
+        if (item) return changeBody(item, ctx);
+        break;
+      }
+      case "stash": {
+        const item = pb.stashes.find((s) => s.repoKey === ref.repo && s.stash.index === ref.index);
+        if (item) return stashBody(item, pb, ctx);
+        break;
+      }
+    }
+    return bodyMessage(t("body.gone"));
+  }
+  return bodyMessage(t("body.noBranchSelection"), { hint: t("body.branchesHint") });
+}
+
 function bodyContent(): string {
   if (!doc) return lastError ? errorMessage() : bodyMessage(t("footer.loading"));
-  if (view === "branches") return bodyMessage(branchesNote(doc), { hint: t("body.branchesHint") });
+  if (view === "branches") return branchBodyContent();
   if (!slots().length && !doc.unregisteredEditors?.length && !doc.orphanWorkers?.length) return bodyMessage(t("empty.noSlots"));
   const ref = selectedRef();
   const ctx = rowContext();
@@ -473,7 +676,10 @@ function bodyContent(): string {
 }
 
 function renderBody() {
-  const title = view === "branches" ? t("view.branchesLabel") : itemTitle(doc ? selectedRef() : null);
+  const title =
+    view === "branches"
+      ? ((branchData && branchItemTitle(parseBranchKey(branchSelected))) ?? t("view.branchesLabel"))
+      : itemTitle(doc ? selectedRef() : null);
   // Long slot names shorten in the middle here too (the clone number stays)
   $("body-title").innerHTML = nameHtml(title, "title-name");
   $("sheet-title").innerHTML = nameHtml(title, "title-name");
@@ -482,7 +688,7 @@ function renderBody() {
 
 function renderPanels() {
   const list = currentWarnings();
-  $("projects-body").innerHTML = projectsPanel(doc, settings, warnedSlots(list), project, doc ? rowContext() : null);
+  $("projects-body").innerHTML = projectsPanel(doc, settings, warnedSlots(list), project, doc ? rowContext() : null, panelViewLine);
   $("warnings-body").innerHTML = warningsPanel(list);
   $("log-body").innerHTML = logPanel(doc ? (doc.recentEvents ?? []) : null, now());
   const counted = (list ?? []).filter((w) => w.severity !== "info");
@@ -496,7 +702,18 @@ function focusEditor(pid: number) {
 /** One banner at most, the most urgent (model.ts `urgentItems`); the rest are counted toward the warnings panel. */
 function bannerState(): BannerState | null {
   const items = urgentItems(doc, settings, lastError);
-  if (!items.length) return null;
+  if (!items.length) {
+    // Below what needs a person now: a view repository run that failed (it stays until the next run)
+    const [failed] = [...bvErrors];
+    if (!failed) return null;
+    const [name, text] = failed;
+    return {
+      key: `bv:${name}:${text}`,
+      message: t("bv.bannerFailed", { project: name, text }),
+      warn: true,
+      actions: [{ label: t("body.retry"), run: () => void runView(name) }],
+    };
+  }
   const first: Urgent = items[0];
   const critical = (currentWarnings() ?? []).filter((w) => w.severity === "critical").length;
   // The error is no warning; the others are among the critical ones
@@ -531,6 +748,32 @@ function renderBanner() {
   showBanner(bannerState());
 }
 
+/**
+ * The folder a branch screen item opens in: a branch's checkout (else a copy with commits on no
+ * remote, else the first), a slot's changes, a stash's slot, a project's first folder.
+ */
+function branchItemPath(key: string | null): string | null {
+  const ref = parseBranchKey(key);
+  const pb = findProject(ref?.project);
+  if (!ref || !pb) return null;
+  const slotPathOf = (name: string | undefined) => (name ? (pb.slots.find((s) => s.name === name)?.path ?? null) : null);
+  switch (ref.kind) {
+    case "branch": {
+      const g = pb.groups.find((x) => x.name === ref.name);
+      return g ? (branchHome(g, pb.slots)?.path ?? null) : null;
+    }
+    case "change":
+      return slotPathOf(ref.slot);
+    case "stash":
+      return slotPathOf(pb.stashes.find((s) => s.repoKey === ref.repo && s.stash.index === ref.index)?.holders[0]);
+    case "project":
+    case "repo":
+      return pb.repos[0]?.repo.folders?.[0]?.path ?? pb.slots[0]?.path ?? null;
+    default:
+      return null;
+  }
+}
+
 /** `..\<name>` for the status bar; the full path is in the title and goes to the clipboard. */
 function shortPath(path: string): string {
   const parts = path.split(/[\\/]/).filter(Boolean);
@@ -539,6 +782,7 @@ function shortPath(path: string): string {
 
 /** The path of the selected item: a slot folder, or the project folder of an editor or worker. */
 function selectedPath(): string | null {
+  if (view === "branches") return branchItemPath(branchSelected);
   const ref = selectedRef();
   if (!ref || !doc) return null;
   if (ref.kind === "slot") return findSlot(ref.name)?.path ?? null;
@@ -641,11 +885,36 @@ function tick() {
 
 // ---------------------------------------------------------------- selection and screen state
 
-function saveCollapsed() {
-  writePref("collapsedGroups", [...collapsed]);
+// Each screen keeps its own selection and folded heads; these work on the screen in view.
+
+function curSelected(): string | null {
+  return view === "branches" ? branchSelected : selected;
 }
 
-/** The group key a selection sits in (a slot's project, the extra group of an editor or worker). */
+function setCurSelected(key: string | null) {
+  if (view === "branches") {
+    branchSelected = key;
+    writePref("branchSelected", key);
+  } else {
+    selected = key;
+    writePref("selected", key);
+  }
+}
+
+function curCollapsed(): Set<string> {
+  return view === "branches" ? branchCollapsed : collapsed;
+}
+
+function saveCollapsed() {
+  if (view === "branches") writePref("branchCollapsed", [...branchCollapsed]);
+  else writePref("collapsedGroups", [...collapsed]);
+}
+
+function curKeys(): string[] {
+  return (view === "branches" ? branchList?.keys : listView?.keys) ?? [];
+}
+
+/** The group key a slot screen selection sits in (a slot's project, the extra group of an editor or worker). */
 function parentKey(ref: ItemRef | null): string | null {
   if (!ref) return null;
   if (ref.kind === "slot") {
@@ -656,65 +925,87 @@ function parentKey(ref: ItemRef | null): string | null {
   return null;
 }
 
+/** The head an item of the screen in view sits under. */
+function curParent(key: string | null): string | null {
+  if (!key) return null;
+  return view === "branches" ? branchParentKey(key) : parentKey(parseKey(key));
+}
+
+/** A head that folds (a project, the extra group; on the branch screen also changes and stashes). */
+function isFoldKey(key: string | null): boolean {
+  if (!key) return false;
+  if (view === "branches") return isBranchFoldKey(key);
+  const ref = parseKey(key);
+  return ref?.kind === "group" || ref?.kind === "extra";
+}
+
+/** `key` lies somewhere under the head `head`. */
+function isUnder(key: string | null, head: string): boolean {
+  for (let p = curParent(key); p; p = curParent(p)) if (p === head) return true;
+  return false;
+}
+
 /**
- * Selects an item. `open` shows the details over the list when the details column is not on
- * screen (a press on a row: pressing the open one again closes them). `reveal` scrolls it into view.
+ * Selects an item of the screen in view. `open` shows the details over the list when the details
+ * column is not on screen (a press on a row: pressing the open one again closes them). `reveal`
+ * scrolls it into view.
  */
 function select(key: string | null, opts: { open?: boolean; reveal?: boolean } = {}) {
-  const same = key === selected;
-  selected = key;
-  writePref("selected", key);
-  const ref = parseKey(key);
-  // A slot in a folded group (picked from a panel): unfold it
-  const parent = parentKey(ref);
-  if (parent && collapsed.delete(parent)) saveCollapsed();
+  const same = key === curSelected();
+  setCurSelected(key);
+  // An item in a folded head (picked from a panel): unfold its heads
+  let unfolded = false;
+  for (let p = curParent(key); p; p = curParent(p)) if (curCollapsed().delete(p)) unfolded = true;
+  if (unfolded) saveCollapsed();
   if (opts.open && sheetMode()) setSheet(same ? !sheetOpen : true);
   revealSelection = opts.reveal === true;
   // First look at a slot: bring the detailed git state if it is old
-  if (ref?.kind === "slot" && !same) freshenFull();
+  if (view === "slots" && parseKey(key)?.kind === "slot" && !same) freshenFull();
   render();
 }
 
 function moveSelection(to: "next" | "prev" | "first" | "last") {
-  const keys = listView?.keys ?? [];
+  const keys = curKeys();
   if (!keys.length) return;
-  const i = selected ? keys.indexOf(selected) : -1;
+  const current = curSelected();
+  const i = current ? keys.indexOf(current) : -1;
   const index =
     to === "first" ? 0 : to === "last" ? keys.length - 1 : to === "next" ? Math.min(keys.length - 1, i + 1) : Math.max(0, i < 0 ? 0 : i - 1);
   select(keys[index], { reveal: true });
 }
 
 function toggleGroup(key: string, open?: boolean) {
-  const fold = open === undefined ? !collapsed.has(key) : !open;
-  if (fold) collapsed.add(key);
-  else collapsed.delete(key);
+  const set = curCollapsed();
+  const fold = open === undefined ? !set.has(key) : !open;
+  if (fold) set.add(key);
+  else set.delete(key);
   saveCollapsed();
-  // The selection inside a group that folds moves to its head
-  if (fold && parentKey(selectedRef()) === key) {
-    selected = key;
-    writePref("selected", key);
-  }
+  // The selection inside a head that folds moves to the head
+  if (fold && isUnder(curSelected(), key)) setCurSelected(key);
   render();
 }
 
-/** ←/→ on the list: fold, unfold, go to the group head or into the group (tree pattern). */
+/** ←/→ on the list: fold, unfold, go to the head or into it (tree pattern). */
 function stepTree(right: boolean): boolean {
-  const ref = selectedRef();
-  if (!ref || !listView) return false;
-  if (ref.kind === "group" || ref.kind === "extra") {
-    const key = selected!;
-    const isCollapsed = collapsed.has(key);
+  const key = curSelected();
+  if (!key || !curKeys().length) return false;
+  if (isFoldKey(key)) {
+    const isCollapsed = curCollapsed().has(key);
     if (!right && !isCollapsed) toggleGroup(key, false);
     else if (right && isCollapsed) toggleGroup(key, true);
     else if (right) {
-      const keys = listView.keys;
+      const keys = curKeys();
       const next = keys[keys.indexOf(key) + 1];
-      if (next && parentKey(parseKey(next)) === key) select(next, { reveal: true });
+      if (next && curParent(next) === key) select(next, { reveal: true });
+    } else {
+      // A folded head inside another (changes, stashes): ← goes up
+      const parent = curParent(key);
+      if (parent) select(parent, { reveal: true });
     }
     return true;
   }
   if (!right) {
-    const parent = parentKey(ref);
+    const parent = curParent(key);
     if (parent) select(parent, { reveal: true });
   }
   return true;
@@ -723,6 +1014,12 @@ function stepTree(right: boolean): boolean {
 function setFilter(next: SlotFilter) {
   filter = next;
   writePref("slotFilter", next);
+  render();
+}
+
+function setBranchFilter(next: BranchFilter) {
+  branchFilter = next;
+  writePref("branchFilter", next);
   render();
 }
 
@@ -753,11 +1050,13 @@ function selectView(next: View) {
   if (next === view) return;
   view = next;
   writePref("view", view);
-  if (view !== "branches") branchFocus = null;
+  // 「이 슬롯 브랜치 보기」 lasts while the branch screen is on
+  if (view !== "branches") branchSlot = null;
   setSheet(false);
   paintViewTabs();
   // The branch screen reads the detailed git state: bring it when it is old
   if (view === "branches") freshenFull();
+  revealSelection = true;
   render();
 }
 
@@ -765,12 +1064,33 @@ function stepView(delta: number) {
   selectView(VIEWS[(VIEWS.indexOf(view) + delta + VIEWS.length) % VIEWS.length]);
 }
 
-/** 「이 슬롯 브랜치 보기」: the branch screen on the slot's project, its repository marked. */
+function clearFind() {
+  findText = "";
+  ($("find-input") as HTMLInputElement).value = "";
+}
+
+/**
+ * 「이 슬롯 브랜치 보기」: the branch screen on the slot's project, only what the slot has, its
+ * checked-out branch selected (the repository row before core 0.7.0 data is there).
+ */
 function showSlotBranches(slot: Slot) {
-  branchFocus = slot.name;
-  revealSelection = true;
-  project = groupName(slot);
+  const name = groupName(slot);
+  branchSlot = slot.name;
+  project = name;
   writePref("projectFilter", project);
+  if (findText) clearFind();
+  const git = gitOf(slot);
+  const branch = git?.detached || git?.branch === "(detached)" ? detachedName({ slot: slot.name, path: slot.path }) : git?.branch;
+  const pb = findProject(name);
+  const hit = branch && pb?.groups.some((g) => g.name === branch);
+  branchSelected = hit ? bBranchKey(name, branch!) : bRepoKey(name);
+  writePref("branchSelected", branchSelected);
+  const g = hit ? pb!.groups.find((x) => x.name === branch) : null;
+  // A clean branch is hidden by the 「주의」 filter: show every branch for now (the saved filter stays)
+  if (g && g.level === "clean" && branchFilter === "attention") {
+    branchFilter = "all";
+  }
+  revealSelection = true;
   if (view === "branches") render();
   else selectView("branches");
 }
@@ -784,12 +1104,30 @@ function reveal(key: string) {
   if (doc && hidden()) {
     filter = "all";
     writePref("slotFilter", filter);
-    findText = "";
-    ($("find-input") as HTMLInputElement).value = "";
+    clearFind();
     if (project !== null && (owner === null || owner !== project)) {
       project = null;
       writePref("projectFilter", null);
     }
+  }
+  select(key, { reveal: true });
+}
+
+/** Shows a branch screen item whatever the filters (a press in the warnings panel). */
+function revealBranch(key: string) {
+  if (view !== "branches") selectView("branches");
+  const ref = parseBranchKey(key);
+  if (!ref) return;
+  branchSlot = null;
+  if (findText) clearFind();
+  if (project !== null && project !== ref.project) {
+    project = null;
+    writePref("projectFilter", null);
+  }
+  if (ref.kind === "branch") {
+    const g = findProject(ref.project)?.groups.find((x) => x.name === ref.name);
+    if (g && g.level === "clean" && branchFilter === "attention") branchFilter = "all";
+    if (g && branchFilter === "checkedout" && !g.checkedOut) branchFilter = "all";
   }
   select(key, { reveal: true });
 }
@@ -802,9 +1140,9 @@ function listKeysActive(): boolean {
   return el.id === "list" || (!!el.closest("#list-main, #body-main") && !el.closest("#list-tools"));
 }
 
-/** ←/→ fold groups only when the list itself has the focus (the chips use them too). */
+/** ←/→ fold heads only when the list itself has the focus (the chips use them too). */
 function treeKeysActive(): boolean {
-  if (isContextMenuOpen() || view !== "slots") return false;
+  if (isContextMenuOpen()) return false;
   const el = document.activeElement;
   return !el || el === document.body || el.id === "list";
 }
@@ -827,7 +1165,7 @@ async function copyPath(path: string) {
 /** The cleanup request for everything, the project filter, a project or one slot. */
 async function copyCleanup(scope: CleanupScope = {}) {
   if (!doc) return;
-  const text = cleanupRequest(doc, now(), gitOf, scope);
+  const text = cleanupRequest(doc, now(), gitOf, scope, currentRepos());
   if (!text) {
     flashStatus(t("toast.cleanupEmpty"));
     return;
@@ -929,6 +1267,270 @@ async function openLog(path: string) {
 
 async function openFolder(path: string) {
   await call("open_folder", { path }).catch(() => flashStatus(t("toast.notFound")));
+}
+
+async function openPath(path: string, target: OpenTarget) {
+  try {
+    await call("open_with", { path, target });
+  } catch (e) {
+    flashStatus(openError(String(e), target), 4000);
+  }
+}
+
+/** The cleanup request for one branch's copies (branch screen). */
+async function copyBranchCleanup(projectName: string, name: string) {
+  const g = findProject(projectName)?.groups.find((x) => x.name === name);
+  if (!g || !doc) return;
+  if (await copyText(branchCleanupRequest(g, slots(), now(), doc.time))) flashStatus(t("toast.cleanupCopied"), 3500);
+}
+
+// ---------------------------------------------------------------- view repository (core 0.7.0 branch-view)
+
+/** What the view repository button of a project does, or why it is off. */
+function viewAction(pb: ProjectBranches): ViewAction {
+  const kind = pb.view?.path && !pb.view.error ? "open" : "create";
+  let off: string | null = null;
+  if (lastResult?.source === "sample") off = t("bv.offSample");
+  else if (!hasBranchViews(doc)) off = t("bv.offCore", { version: doc?.version ?? "?" });
+  else if (bvRunning) off = t(bvRunning.project === pb.project ? "bv.running" : "bv.offBusy");
+  else if (kind === "create" && pb.slots.length < 2) off = t("bv.offOneSlot");
+  return { kind, off };
+}
+
+/** The label of the button: make it, or refresh it (and open it in Fork when the setting says so). */
+function viewButtonLabel(action: ViewAction, short = false): string {
+  if (action.kind === "create") return t(short ? "bv.createShort" : "bv.create");
+  if (!settings.branchViewOpenFork) return t(short ? "bv.refreshShort" : "bv.refresh");
+  return t(short ? "bv.openShort" : "bv.openAll");
+}
+
+/** Side panel [P]: 「보기용 11:20 [Fork]」 or 「보기용 없음 [만들기…]」 under a project (core 0.7.0). */
+function panelViewLine(name: string, members: Slot[]): string {
+  const pb = findProject(name);
+  if (!pb || !hasRepos(doc) || (!pb.view && members.length < 2)) return "";
+  const line = viewLine(pb, branchContext());
+  const action = viewAction(pb);
+  return `<div class="view-line"><span class="grow${line.tone ? ` ${line.tone}-text` : ""}" title="${esc(pb.view?.path ?? "")}">${esc(line.text)}</span><button type="button" class="link-btn" data-bv="${esc(
+    name,
+  )}"${action.off ? ` disabled title="${esc(action.off)}"` : ` title="${esc(t(action.kind === "create" ? "bv.createTitle" : "bv.openAllTitle"))}"`}>${esc(viewButtonLabel(action, true))}</button></div>`;
+}
+
+function bvErrorText(code: string): string {
+  const [kind, ...rest] = code.split(":");
+  const text = rest.join(":");
+  switch (kind) {
+    case "sample":
+      return t("bv.offSample");
+    case "busy":
+      return t("bv.offBusy");
+    case "core-not-found":
+      return t("error.core-not-found");
+    case "bad-project":
+      return t("bv.badProject");
+    case "parse":
+      return t("error.parse");
+    case "spawn":
+      return t("error.spawn", { text });
+    case "exit":
+      return t("bv.exit", { text: rest.slice(1).join(":") || text });
+    default:
+      return code;
+  }
+}
+
+/** The plan or result entry for a project in a `branch-view -Json` document. */
+function viewEntry(result: BranchViewResult, registry: string): BranchViewPlan | null {
+  const views = result.document.views ?? [];
+  return views.find((v) => (v.project ?? "").toLowerCase() === registry.toLowerCase()) ?? views[0] ?? null;
+}
+
+/** Why a plan or a run did not do its work, or null. */
+function viewProblem(entry: BranchViewPlan | null, result: BranchViewResult): string | null {
+  if (!entry) return t("bv.noEntry");
+  if (entry.action === "skip") return t("bv.skipped", { reason: entry.reason ?? "" });
+  if (entry.action === "busy" || result.exitCode === 4) return t("bv.busyCore");
+  if (entry.action === "error" || entry.error) return entry.error ?? t("bv.noEntry");
+  return null;
+}
+
+function failView(name: string, text: string) {
+  bvErrors.set(name, text);
+  flashStatus(t("bv.failed", { text }), 6000);
+}
+
+/** A run ended: refresh the dashboard (its branchViews), say what happened, open Fork. */
+async function finishView(name: string, registry: string, result: BranchViewResult) {
+  const entry = viewEntry(result, registry);
+  const problem = viewProblem(entry, result);
+  void refresh(false);
+  if (problem || !entry) {
+    failView(name, problem ?? t("bv.noEntry"));
+    return;
+  }
+  bvErrors.delete(name);
+  const fetched = (entry.slots ?? []).filter((s) => s.action === "fetched").length;
+  const failed = (entry.slots ?? []).filter((s) => s.action === "failed" || s.status === "failed").length;
+  flashStatus(t(failed ? "bv.doneFailed" : "bv.done", { project: name, n: fetched, failed }), 5000);
+  if (settings.branchViewOpenFork && entry.path) await openPath(entry.path, "fork");
+}
+
+/** The confirmation before a view repository is made: where, how many slots, how big, what it is not. */
+function confirmCreate(name: string, entry: BranchViewPlan): Promise<boolean> {
+  const slotNames = (entry.slots ?? []).map((s) => s.slot);
+  const gb = typeof entry.estimatedBytes === "number" ? (entry.estimatedBytes / 1024 ** 3).toFixed(1) : "?";
+  const detail = [
+    t("bv.detailPath", { path: entry.path ?? "?" }),
+    t("bv.detailSlots", { n: slotNames.length, list: slotNames.join(", ") }),
+    t("bv.detailSize", { gb }),
+    t("bv.detailReadOnly"),
+    t("bv.detailNotBackup"),
+  ].join("\n");
+  return showDialog({
+    title: t("bv.confirmTitle", { project: name }),
+    message: t("bv.confirmMessage", { n: slotNames.length }),
+    detail,
+    confirmLabel: t("bv.confirmCreate"),
+    cancelLabel: t("dialog.cancel"),
+  });
+}
+
+/**
+ * The view repository button (a person pressed it): without a view, plan first (`branch-view -Json`,
+ * writes nothing) and ask; then `-Apply` (incremental when it exists) and open it in Fork. Never
+ * while sample data is shown or with a core before 0.7.0. A run past the time limit goes on; its
+ * result comes as `branch-view-finished`.
+ */
+async function runView(name: string) {
+  const pb = findProject(name);
+  if (!pb) return;
+  const action = viewAction(pb);
+  if (action.off) {
+    flashStatus(action.off, 4000);
+    return;
+  }
+  const registry = pb.slots.find((s) => s.project)?.project ?? name;
+  bvErrors.delete(name);
+  bvRunning = { project: name, registry };
+  render();
+  let late = false;
+  try {
+    if (action.kind === "create") {
+      flashStatus(t("bv.planning", { project: name }), 60_000);
+      const plan = await call<BranchViewResult>("branch_view", { project: registry, apply: false });
+      const entry = viewEntry(plan, registry);
+      const problem = viewProblem(entry, plan);
+      if (problem || !entry) {
+        failView(name, problem ?? t("bv.noEntry"));
+        return;
+      }
+      flashStatus("", 1);
+      // The plan can find a view the dashboard did not know (made elsewhere): then no question
+      if (!entry.exists && !(await confirmCreate(name, entry))) {
+        flashStatus(t("bv.cancelled"));
+        return;
+      }
+    }
+    flashStatus(t(action.kind === "create" ? "bv.creating" : "bv.refreshing", { project: name }), 200_000);
+    const result = await call<BranchViewResult>("branch_view", { project: registry, apply: true });
+    bvRunning = null;
+    await finishView(name, registry, result);
+  } catch (e) {
+    const code = String(e);
+    if (code === "timeout") {
+      // Still running in the core (never killed): the button stays off until it ends
+      late = true;
+      flashStatus(t("bv.slow", { project: name }), 10_000);
+      return;
+    }
+    failView(name, bvErrorText(code));
+  } finally {
+    if (!late) bvRunning = null;
+    render();
+  }
+}
+
+/** A run that outlasted the time limit ended (lib.rs `branch_view`). */
+function onViewFinished(payload: { project: string; apply: boolean; result?: BranchViewResult; error?: string }) {
+  const running = bvRunning;
+  if (!running || running.registry !== payload.project) return;
+  bvRunning = null;
+  if (payload.result && payload.apply) void finishView(running.project, running.registry, payload.result).then(render);
+  else {
+    failView(running.project, payload.error ? bvErrorText(payload.error) : t("bv.noEntry"));
+    render();
+  }
+}
+
+// ---------------------------------------------------------------- branch screen menus
+
+function branchMenu(key: string): MenuEntry[] {
+  const ref = parseBranchKey(key);
+  const pb = findProject(ref?.project);
+  if (!ref || !pb) return [];
+  const target = settings.openTarget;
+  const openLabel = t("menu.open", { app: t(`open.${target}`) });
+  const pathOf = (name: string | null | undefined) => (name ? (pb.slots.find((s) => s.name === name)?.path ?? null) : null);
+  const foldItem = (k: string): MenuEntry => ({ label: t(branchCollapsed.has(k) ? "menu.unfold" : "menu.fold"), shortcut: "Enter", action: () => toggleGroup(k) });
+  const folderItems = (path: string | null): MenuEntry[] =>
+    path
+      ? [
+          { label: openLabel, shortcut: "Ctrl+O", action: () => void openPath(path, target) },
+          ...(target !== "explorer" ? [{ label: t("menu.openExplorer"), action: () => void openFolder(path) }] : []),
+        ]
+      : [];
+  switch (ref.kind) {
+    case "project":
+      return [
+        foldItem(key),
+        { label: t(project === pb.project ? "group.showAll" : "group.onlyThis"), action: () => setProject(project === pb.project ? null : pb.project) },
+        "separator",
+        { label: t("menu.cleanupScope", { scope: pb.project }), action: () => void copyCleanup(projectScope(pb.project)) },
+      ];
+    case "repo": {
+      const action = viewAction(pb);
+      const viewPath = pb.view?.path;
+      return [
+        ...folderItems(pb.repos[0]?.repo.folders?.[0]?.path ?? pb.slots[0]?.path ?? null),
+        "separator",
+        { label: viewButtonLabel(action), disabled: action.off !== null, action: () => void runView(pb.project) },
+        ...(viewPath ? [{ label: t("bv.openFork"), action: () => void openPath(viewPath, "fork") }] : []),
+        "separator",
+        { label: t("menu.cleanupScope", { scope: pb.project }), action: () => void copyCleanup(projectScope(pb.project)) },
+      ];
+    }
+    case "branch": {
+      const g = pb.groups.find((x) => x.name === ref.name);
+      if (!g) return [];
+      const entries: MenuEntry[] = [{ label: t("branch.copyName"), shortcut: "Ctrl+C", action: () => void copyPath(g.name) }];
+      // Every folder that has it checked out; several make one item each
+      const outs = [...new Map(g.copies.flatMap((c) => c.checkouts).map((k) => [k.path, k])).values()];
+      if (outs.length > 1) {
+        for (const k of outs) entries.push({ label: t("branch.openIn", { app: t(`open.${target}`), slot: k.slot ?? k.path }), action: () => void openPath(k.path, target) });
+      } else {
+        const home = branchHome(g, pb.slots);
+        entries.push(...folderItems(home?.path ?? null));
+      }
+      entries.push("separator", { label: t("branch.cleanup"), action: () => void copyBranchCleanup(pb.project, g.name) });
+      const viewPath = pb.view?.path;
+      const ref2 = g.copies.map((c) => viewRef(pb.view, c)).find((r): r is string => !!r);
+      if (ref2 || viewPath) entries.push("separator");
+      if (ref2) entries.push({ label: t("bv.copyRef"), action: () => void copyPath(ref2) });
+      if (viewPath) entries.push({ label: t("bv.openFork"), action: () => void openPath(viewPath, "fork") });
+      return entries;
+    }
+    case "changes":
+    case "stashes":
+      return [foldItem(key)];
+    case "change": {
+      const path = pathOf(ref.slot);
+      return path ? [...folderItems(path), "separator", { label: t("btn.copyPath"), action: () => void copyPath(path) }] : [];
+    }
+    case "stash": {
+      const item = pb.stashes.find((s) => s.repoKey === ref.repo && s.stash.index === ref.index);
+      if (!item) return [];
+      return [...folderItems(pathOf(item.holders[0])), "separator", { label: t("branch.copyMessage"), action: () => void copyPath(item.stash.message ?? "") }];
+    }
+  }
 }
 
 function slotMenu(slot: Slot): MenuEntry[] {
@@ -1152,6 +1754,15 @@ function onActionClick(e: MouseEvent): boolean {
     case "copy-text":
       if (data.text) void copyPath(data.text);
       break;
+    case "open-path":
+      if (data.path) void openPath(data.path, (OPEN_TARGETS as readonly string[]).includes(data.target ?? "") ? (data.target as OpenTarget) : settings.openTarget);
+      break;
+    case "bv-run":
+      if (data.project) void runView(data.project);
+      break;
+    case "branch-cleanup":
+      if (data.project && data.name) void copyBranchCleanup(data.project, data.name);
+      break;
   }
   return true;
 }
@@ -1182,14 +1793,20 @@ function onContextMenu(e: MouseEvent) {
   e.preventDefault();
   const key = target.closest<HTMLElement>("#list [data-item]")?.dataset.item;
   if (!key) return;
-  if (key !== selected) select(key);
-  const entries = itemMenu(parseKey(key));
+  if (key !== curSelected()) select(key);
+  const entries = menuFor(key);
   if (entries.length) showContextMenu(e, entries);
 }
 
+/** The right-click menu of an item of the screen in view. */
+function menuFor(key: string | null): MenuEntry[] {
+  if (!key) return [];
+  return view === "branches" ? (isBranchKey(key) ? branchMenu(key) : []) : itemMenu(parseKey(key));
+}
+
 function openRowMenu(): boolean {
-  if (!selected || !listKeysActive() || view !== "slots") return false;
-  const entries = itemMenu(selectedRef());
+  if (!curSelected() || !listKeysActive()) return false;
+  const entries = menuFor(curSelected());
   if (!entries.length) return false;
   const row = document.querySelector<HTMLElement>("#list-inner [data-item].selected");
   const r = (row ?? $("list")).getBoundingClientRect();
@@ -1199,10 +1816,10 @@ function openRowMenu(): boolean {
 
 function onEnter(): boolean {
   const el = document.activeElement;
-  if (!selected || !listKeysActive() || view !== "slots" || (el && el.closest("button, a"))) return false;
-  const ref = selectedRef();
-  if (ref?.kind === "group" || ref?.kind === "extra") {
-    toggleGroup(selected);
+  const key = curSelected();
+  if (!key || !listKeysActive() || !curKeys().length || (el && el.closest("button, a"))) return false;
+  if (isFoldKey(key)) {
+    toggleGroup(key);
     return true;
   }
   if (sheetMode()) {
@@ -1272,6 +1889,25 @@ function bindEvents() {
     setFilter(next);
     document.querySelector<HTMLElement>(`#filter-chips [data-filter="${next}"]`)?.focus();
   });
+  $("branch-chips").addEventListener("click", (e) => {
+    const value = (e.target as HTMLElement).closest<HTMLElement>("[data-bfilter]")?.dataset.bfilter;
+    if (isBranchFilter(value)) setBranchFilter(value);
+  });
+  $("branch-chips").addEventListener("keydown", (e) => {
+    if (e.key !== "ArrowLeft" && e.key !== "ArrowRight") return;
+    e.preventDefault();
+    const step = e.key === "ArrowRight" ? 1 : BRANCH_FILTERS.length - 1;
+    const next = BRANCH_FILTERS[(BRANCH_FILTERS.indexOf(branchFilter) + step) % BRANCH_FILTERS.length];
+    setBranchFilter(next);
+    document.querySelector<HTMLElement>(`#branch-chips [data-bfilter="${next}"]`)?.focus();
+  });
+  // 「깨끗 24 숨김」: show every branch
+  $("branch-hidden").addEventListener("click", () => setBranchFilter("all"));
+  // The slot filter chip clears it
+  $("branch-slot").addEventListener("click", () => {
+    branchSlot = null;
+    render();
+  });
   $("project-btn").addEventListener("click", (e) => {
     const button = e.currentTarget as HTMLElement;
     if (isContextMenuOpen()) hideContextMenu();
@@ -1291,6 +1927,11 @@ function bindEvents() {
 
   $("projects-body").addEventListener("click", (e) => {
     const target = e.target as HTMLElement;
+    const bv = target.closest<HTMLElement>("[data-bv]");
+    if (bv) {
+      void runView(bv.dataset.bv!);
+      return;
+    }
     if (target.closest("[data-extra]")) {
       showExtra();
       return;
@@ -1303,7 +1944,11 @@ function bindEvents() {
     if (!name || !findSlot(name)) return;
     reveal(slotKey(name));
   };
-  $("warnings-body").addEventListener("click", pickSlot);
+  $("warnings-body").addEventListener("click", (e) => {
+    const branch = (e.target as HTMLElement).closest<HTMLElement>("[data-branch]")?.dataset.branch;
+    if (branch) revealBranch(branch);
+    else pickSlot(e);
+  });
   $("log-body").addEventListener("click", pickSlot);
   $("warnings-copy").addEventListener("click", () => void copyCleanup());
 
@@ -1338,7 +1983,7 @@ function bindEvents() {
   setBannerFocusHome(() => $("list").focus());
   initBodyResize({ fold: () => setBodyOpen(false) });
 
-  const inList = (fn: () => void) => () => listKeysActive() && view === "slots" && (fn(), true);
+  const inList = (fn: () => void) => () => listKeysActive() && (fn(), true);
   initKeys([
     { keys: "Ctrl+1", run: () => selectView("slots") },
     { keys: "Ctrl+2", run: () => selectView("branches") },
@@ -1368,7 +2013,9 @@ function bindEvents() {
     {
       keys: "Ctrl+C",
       run: () => {
-        const path = selectedPath();
+        // A branch copies its name; anything else its folder
+        const ref = view === "branches" ? parseBranchKey(branchSelected) : null;
+        const path = ref?.kind === "branch" ? ref.name : selectedPath();
         // Selected text copies as usual
         if (!path || (window.getSelection()?.toString() ?? "") !== "") return false;
         void copyPath(path);
@@ -1377,6 +2024,11 @@ function bindEvents() {
     {
       keys: "Ctrl+O",
       run: () => {
+        if (view === "branches") {
+          const path = selectedPath();
+          if (path) void openPath(path, settings.openTarget);
+          return;
+        }
         const slot = selectedSlot();
         if (slot) void openSlot(slot, settings.openTarget);
       },
@@ -1404,7 +2056,14 @@ function bindEvents() {
 function applyPreviewQuery() {
   const query = new URLSearchParams(location.search);
   const pick = query.get("select");
-  if (pick !== null) selected = pick ? (/^[sgxew]:/.test(pick) ? pick : slotKey(pick)) : null;
+  // A branch screen key (bb:..., br:...) selects there; anything else on the slot screen
+  if (pick !== null && isBranchKey(pick)) branchSelected = pick;
+  else if (pick !== null) selected = pick ? (/^[sgxew]:/.test(pick) ? pick : slotKey(pick)) : null;
+  // ?branch=<name>: that branch once the data is there; ?bfilter=attention|checkedout|all; ?bslot=<slot>
+  pendingBranchName = query.get("branch");
+  const bf = query.get("bfilter");
+  if (isBranchFilter(bf)) branchFilter = bf;
+  branchSlot = query.get("bslot");
   const tab = query.get("nav");
   if (tab === "closed") nav.setOpen(false);
   else if (tab) nav.show(tab);
@@ -1465,6 +2124,8 @@ async function boot() {
   await on("settings-file-changed", reloadSettings);
   // The tray menu's Settings
   await on("open-settings", () => openSettings());
+  // A view repository run that outlasted the time limit ended
+  await on("branch-view-finished", onViewFinished);
 
   window.setInterval(tick, 1000);
   void refresh(true);

@@ -84,6 +84,14 @@
             <button type="button" role="radio" class="chip-btn" data-filter="open" data-t="filter.open"></button>
             <button type="button" role="radio" class="chip-btn" data-filter="attention" data-t="filter.attention"></button>
           </div>
+          <!-- Branch screen (core 0.7.0): what to show, how many the filter hides, 「이 슬롯 브랜치 보기」 -->
+          <div id="branch-chips" role="radiogroup" data-t-aria="bfilter.label" hidden>
+            <button type="button" role="radio" class="chip-btn" data-bfilter="attention" data-t="bfilter.attention" data-t-title="bfilter.attentionTitle"></button>
+            <button type="button" role="radio" class="chip-btn" data-bfilter="checkedout" data-t="bfilter.checkedout" data-t-title="bfilter.checkedoutTitle"></button>
+            <button type="button" role="radio" class="chip-btn" data-bfilter="all" data-t="bfilter.all"></button>
+          </div>
+          <button id="branch-hidden" class="link-btn" type="button" hidden></button>
+          <button id="branch-slot" class="chip-btn slot-chip" type="button" hidden></button>
         </div>
         <div id="list" tabindex="0" role="tree" data-t-aria="list.label"><div id="list-inner"></div></div>
       </section>

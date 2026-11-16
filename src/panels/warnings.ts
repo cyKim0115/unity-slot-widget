@@ -1,10 +1,12 @@
 /**
  * Side panel [!n]: warnings by level (critical, attention, information). A row about a slot selects
- * it (`data-slot`); one about a repository several slots share selects the first of them.
+ * it (`data-slot`); one about a repository several slots share selects the first of them; one about
+ * a branch (core 0.7.0) opens it on the branch screen (`data-branch`, an item key).
  */
 import { t } from "../i18n";
 import type { Severity, Warning } from "../model";
 import { esc } from "../view";
+import { bBranchKey } from "../screens/branches";
 
 const SEVERITIES: Severity[] = ["critical", "warn", "info"];
 
@@ -16,7 +18,9 @@ export function warningsPanel(list: readonly Warning[] | null): string {
     if (!items.length) return "";
     return `<h3 class="panel-sub">${esc(t(`panel.${severity}`))}</h3><ul class="panel-list">${items
       .map(
-        (w) => `<li><button type="button" class="panel-row warn-row"${w.slot ? ` data-slot="${esc(w.slot)}"` : ""}>
+        (w) => `<li><button type="button" class="panel-row warn-row"${w.slot ? ` data-slot="${esc(w.slot)}"` : ""}${
+          w.branch ? ` data-branch="${esc(bBranchKey(w.branch.project, w.branch.name))}"` : ""
+        }>
           <span class="sev ${severity}" aria-hidden="true"></span><span class="grow">${esc(w.text)}</span>
         </button></li>`,
       )

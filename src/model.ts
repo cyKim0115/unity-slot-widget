@@ -18,6 +18,8 @@ export interface Warning {
   slot?: string;
   /** Every slot it is about, when more than one (a repository that several slots share). */
   slots?: string[];
+  /** The branch it is about (core 0.7.0): the warnings panel opens it on the branch screen. */
+  branch?: { project: string; name: string };
 }
 
 const DAY = 86_400_000;
@@ -362,6 +364,7 @@ export function warnings(
       severity: hit.days >= settings.localOnlyCriticalDays ? "critical" : "warn",
       ...(hit.slots.length ? { slot: hit.slots[0] } : {}),
       ...(hit.slots.length > 1 ? { slots: hit.slots } : {}),
+      branch: { project: hit.project, name: hit.names[0] },
       text: t("flag.branch-local-only-old", { branch: hit.names.join(", "), slot: hit.slots.join(", ") || hit.project, n: hit.n, days: hit.days }),
     });
   }

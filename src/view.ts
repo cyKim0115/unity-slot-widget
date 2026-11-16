@@ -3,10 +3,10 @@
  * details column. Every value from the dashboard goes through `esc`. Rows keep the widget's
  * drawing: name line, state line, colored numbers without backgrounds, tinted rows for attention.
  */
-import type { GitState, Slot, SlotEvent, WidgetSettings } from "./types";
+import type { GitState, RepoGit, Slot, SlotEvent, WidgetSettings } from "./types";
 import { formatDuration, formatGb, formatWhen, t } from "./i18n";
 import { icon } from "./icons";
-import { elapsedSince, isOpen, localOnlyDays, type RepoCounts, repoCounts, repoKey, slotRepoKey } from "./model";
+import { elapsedSince, isOpen, localOnlyDays, type RepoCounts, repoCounts, repoKey, repoOfSlot, slotRepoKey } from "./model";
 
 export function esc(value: unknown): string {
   return String(value ?? "")
@@ -82,6 +82,8 @@ export interface RowContext {
   shared: ReadonlyMap<string, Slot[]>;
   /** The core's recent events (the details column's 「최근」 row). */
   events?: readonly SlotEvent[];
+  /** Core 0.7.0 git directories, the last full answer kept (model.ts mergeRepos): branch names. */
+  repos?: readonly RepoGit[] | null;
 }
 
 /** The slots that share this slot's git directory, or null for a clone. */
@@ -129,7 +131,7 @@ export function repoPills(counts: RepoCounts | null, ctx: Pick<RowContext, "now"
  * The row's git numbers. A clone shows all of them; a slot whose git directory others share shows
  * only its folder's (changes, ahead, behind) and leaves the repository's to the group head.
  */
-export function gitPills(git: GitState | null, ctx: RowContext, withRepo = true): string {
+export function gitPills(git: GitState | null, ctx: RowContext, withRepo = true, extra: readonly string[] = []): string {
   const out: string[] = [];
   if (git) {
     const changes = git.changes ?? 0;
@@ -142,6 +144,7 @@ export function gitPills(git: GitState | null, ctx: RowContext, withRepo = true)
       out.push(...repoPills(counts, ctx));
     }
   }
+  out.push(...extra);
   return out.length ? `<span class="pills">${out.join("")}</span>` : "";
 }
 
@@ -213,6 +216,28 @@ export function slotEvents(slot: Slot, events: readonly SlotEvent[] | undefined,
     .join(" · ");
 }
 
+const NAMES_SHOWN = 8;
+
+/** The branch names of the slot's git directory (core 0.7.0, last full answer): its own first, marked. */
+function branchNames(slot: Slot, git: GitState, ctx: RowContext): string | null {
+  const list = repoOfSlot(slot, ctx.repos, ctx.gitOf)?.branches;
+  if (!list?.length) return null;
+  const mine = git.branch;
+  const names = [...list.filter((b) => b.name === mine), ...list.filter((b) => b.name !== mine)].map((b) => (b.name === mine ? `${b.name} *` : b.name));
+  const more = names.length - NAMES_SHOWN;
+  return more > 0 ? t("detail.branchNamesMore", { list: names.slice(0, NAMES_SHOWN).join(", "), n: more }) : names.join(", ");
+}
+
+/** The checked-out branch's own commits on no remote, for a slot whose repository numbers sit on the group head. */
+function currentBranchPill(slot: Slot, git: GitState | null, ctx: RowContext): string[] {
+  const branch = repoOfSlot(slot, ctx.repos, ctx.gitOf)?.branches?.find((b) => b.name === git?.branch);
+  const n = branch?.localOnly?.commits ?? 0;
+  if (!branch || n <= 0) return [];
+  const days = localOnlyDays({ localOnly: branch.localOnly }, ctx.now);
+  const kind = days !== null && days >= ctx.settings.localOnlyCriticalDays ? "hot" : days !== null && days >= ctx.settings.localOnlyWarnDays ? "warn" : "local";
+  return [pill(kind, icon("cloudOff", 11), n, t("git.branchLocalOnly", { n, branch: branch.name }))];
+}
+
 /** The git rows: the folder (branch, changes, ↑↓, fetch) and the branches of its repository. */
 function gitRows(slot: Slot, ctx: RowContext): string[] {
   const none = t("detail.none");
@@ -241,6 +266,8 @@ function gitRows(slot: Slot, ctx: RowContext): string[] {
   } else {
     branches = `<span class="muted">${esc(t("detail.gitFullPending"))}</span>`;
   }
+  const names = branchNames(slot, g, ctx);
+  if (names) branches += `<br><span class="branch-names">${esc(names)}</span>`;
   branches += `<br><button type="button" class="link-btn" data-act="branches">${esc(t("detail.showBranches"))}</button>`;
   rows.push(detailRow(t("detail.branches"), branches));
   return rows;
@@ -352,7 +379,7 @@ export function row(slot: Slot, ctx: RowContext, key: string): string {
     </div>
     <div class="slot-foot">
       <div class="slot-sub">${subLine(slot, git, ctx)}</div>
-      ${gitPills(git, ctx, !shared)}
+      ${gitPills(git, ctx, !shared, shared ? currentBranchPill(slot, git, ctx) : [])}
     </div>
   </li>`;
 }
