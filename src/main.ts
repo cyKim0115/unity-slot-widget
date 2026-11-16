@@ -40,7 +40,7 @@
  */
 
 import { call, inTauri, isWindowVisible, on } from "./backend";
-import { applyDomTexts, currentLang, formatClock, formatDuration, formatWhen, resolveLang, setLang, t } from "./i18n";
+import { applyDomTexts, currentLang, formatClock, formatDuration, formatSize, formatWhen, resolveLang, setLang, t } from "./i18n";
 import { glance, newRisks } from "./glance";
 import {
   cleanupRequest,
@@ -1380,11 +1380,10 @@ async function finishView(name: string, registry: string, result: BranchViewResu
 /** The confirmation before a view repository is made: where, how many slots, how big, what it is not. */
 function confirmCreate(name: string, entry: BranchViewPlan): Promise<boolean> {
   const slotNames = (entry.slots ?? []).map((s) => s.slot);
-  const gb = typeof entry.estimatedBytes === "number" ? (entry.estimatedBytes / 1024 ** 3).toFixed(1) : "?";
   const detail = [
     t("bv.detailPath", { path: entry.path ?? "?" }),
     t("bv.detailSlots", { n: slotNames.length, list: slotNames.join(", ") }),
-    t("bv.detailSize", { gb }),
+    t("bv.detailSize", { size: formatSize(entry.estimatedBytes) }),
     t("bv.detailReadOnly"),
     t("bv.detailNotBackup"),
   ].join("\n");
@@ -1459,7 +1458,8 @@ function onViewFinished(payload: { project: string; apply: boolean; result?: Bra
   bvRunning = null;
   if (payload.result && payload.apply) void finishView(running.project, running.registry, payload.result).then(render);
   else {
-    failView(running.project, payload.error ? bvErrorText(payload.error) : t("bv.noEntry"));
+    // A plan that ended late made nothing and asked nothing: the person presses again
+    failView(running.project, payload.error ? bvErrorText(payload.error) : payload.apply ? t("bv.noEntry") : t("bv.latePlan"));
     render();
   }
 }

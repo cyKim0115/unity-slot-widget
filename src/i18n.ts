@@ -80,6 +80,15 @@ export function formatDate(iso: string | null | undefined): string {
   return date.toLocaleDateString(locale(), { year: "numeric", month: "2-digit", day: "2-digit" });
 }
 
+/** A byte count for people: 「0.6 GB」 from about a tenth of a GB, 「35 MB」 below, 「< 1 MB」 for less. */
+export function formatSize(bytes: number | null | undefined): string {
+  if (bytes === null || bytes === undefined || !Number.isFinite(bytes) || bytes < 0) return "?";
+  const mb = bytes / 1024 ** 2;
+  if (mb < 1) return "< 1 MB";
+  if (mb < 100) return `${Math.round(mb)} MB`;
+  return `${(bytes / 1024 ** 3).toFixed(1)} GB`;
+}
+
 export function formatGb(value: number | null | undefined): string {
   if (value === null || value === undefined || !Number.isFinite(value)) return t("detail.none");
   return value.toFixed(1);

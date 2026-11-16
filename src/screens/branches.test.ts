@@ -1,5 +1,5 @@
 import { beforeAll, describe, expect, it } from "vitest";
-import { setLang, t } from "../i18n";
+import { formatSize, setLang, t } from "../i18n";
 import { buildProjects } from "../branches";
 import { defaultSettings } from "../settings";
 import type { Dashboard, RepoGit, Slot } from "../types";
@@ -120,5 +120,15 @@ describe("branch list", () => {
     expect(hasBranchViews(doc)).toBe(true);
     expect(hasBranchViews({ schema: "x", version: "0.7.0" })).toBe(false);
     expect(hasBranchViews({ schema: "x", version: "0.6.1", branchViews: [] })).toBe(false);
+  });
+});
+
+describe("the view repository's estimated size", () => {
+  it("says GB from about a tenth of a GB, MB below, and never 0.0 GB", () => {
+    expect(formatSize(614_000_000)).toBe("0.6 GB");
+    expect(formatSize(1.5 * 1024 ** 3)).toBe("1.5 GB");
+    expect(formatSize(35 * 1024 ** 2)).toBe("35 MB");
+    expect(formatSize(0)).toBe("< 1 MB");
+    expect(formatSize(null)).toBe("?");
   });
 });
