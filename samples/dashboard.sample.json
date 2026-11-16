@@ -1,6 +1,6 @@
 {
   "schema": "unity-slot.dashboard/1",
-  "version": "0.3.0",
+  "version": "0.6.1",
   "time": "2026-11-06T18:20:00+09:00",
   "host": "DEV-PC",
   "registry": { "path": "C:\\Projects\\.unity-slot\\slots.json", "updatedAt": "2026-11-06T16:55:55+09:00", "maxEditors": 6 },
@@ -45,7 +45,7 @@
         "localOnly": { "commits": 103, "oldestAt": "2026-09-14T11:02:00+09:00" },
         "branches": { "total": 16, "noUpstream": 10, "upstreamGone": 0 },
         "stash": 0,
-        "worktrees": [{ "path": "C:\\Projects\\MyGame-release", "branch": "build/webgl" }],
+        "worktrees": ["C:\\Projects\\MyGame-release"],
         "error": null
       },
       "lastOpenedAt": "2026-11-05T09:40:26+09:00",
@@ -84,7 +84,8 @@
         "expiresAt": "2026-11-07T00:10:00+09:00",
         "expired": false,
         "openedByAcquire": false,
-        "host": "DEV-PC"
+        "host": "DEV-PC",
+        "client": { "name": "claude.exe", "pid": 40112, "startedAt": "2026-11-06T16:08:41+09:00", "alive": true }
       },
       "git": {
         "level": "full",
@@ -220,10 +221,10 @@
         "behind": 0,
         "lastFetchAt": "2026-11-06T18:12:00+09:00",
         "commonDir": "C:\\Projects\\MyGame\\.git",
-        "localOnly": { "commits": 0, "oldestAt": null },
-        "branches": null,
+        "localOnly": { "commits": 103, "oldestAt": "2026-09-14T11:02:00+09:00" },
+        "branches": { "total": 16, "noUpstream": 10, "upstreamGone": 0 },
         "stash": 0,
-        "worktrees": [],
+        "worktrees": ["C:\\Projects\\MyGame"],
         "error": null
       },
       "lastOpenedAt": "2026-11-05T21:30:00+09:00",
@@ -358,7 +359,15 @@
       "flags": []
     }
   ],
-  "unregisteredEditors": [],
+  "unregisteredEditors": [
+    {
+      "pid": 52004,
+      "project": "C:\\Projects\\Sandbox",
+      "startedAt": "2026-11-06T17:05:00+09:00",
+      "launch": "hub",
+      "memory": { "editorPrivGB": 2.4, "workersPrivGB": 0.6, "childrenPrivGB": 0.1, "totalPrivGB": 3.1, "totalWsGB": 2.2, "workers": 1, "children": 3 }
+    }
+  ],
   "orphanWorkers": [],
   "recentEvents": [
     { "time": "2026-11-06T16:10:00+09:00", "event": "acquire", "slot": "MyGame-1", "owner": "claude:93ccbb47", "pid": 41236, "via": "mcp", "detail": null },
