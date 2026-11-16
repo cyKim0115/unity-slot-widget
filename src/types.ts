@@ -158,9 +158,18 @@ export interface OpenResult {
 export const OPEN_TARGETS = ["fork", "cmd", "git_bash", "cursor", "vscode", "explorer"] as const;
 export type OpenTarget = (typeof OPEN_TARGETS)[number];
 
+/** widget.json (src-tauri/src/settings.rs). Ranges and defaults: src/settings.ts. */
 export interface WidgetSettings {
   language: "auto" | "ko" | "en";
-  alwaysOnTop: boolean;
+  /** Main window always on top: the title bar pin (the old `alwaysOnTop` key is not read). */
+  windowOnTop: boolean;
+  /** The close box (X): quit the app or hide it to the tray. */
+  closeAction: "quit" | "tray";
+  /** Started by Windows: show the window minimized (refreshes go on). */
+  startMinimized: boolean;
+  theme: "system" | "light" | "dark";
+  /** Theme fade in ms, 0 to 1000. */
+  themeDurationMs: number;
   idleSecs: number;
   startingSecs: number;
   gitFullMins: number;
@@ -170,15 +179,21 @@ export interface WidgetSettings {
   slotMemoryWarnGb: number;
   localOnlyWarnDays: number;
   localOnlyCriticalDays: number;
+  /** Flash the taskbar button when a new risk appears. */
+  flashTaskbar: boolean;
   openTarget: OpenTarget;
+  /** Open the branch view repository in Fork after refreshing it. */
+  branchViewOpenFork: boolean;
   unitySlotScript: string;
   sampleFile: string;
-  /** system | light | dark (default system). The three below are optional: an older build of the Rust side does not send them. */
-  theme?: "system" | "light" | "dark";
-  /** Theme fade in ms, 0 to 1000 (default 250). */
-  themeDurationMs?: number;
-  /** Main window always on top: the title bar pin (default false; the old `alwaysOnTop` is not read). */
-  windowOnTop?: boolean;
+}
+
+/** `get_app_info`: what the settings About and Core tabs show. */
+export interface AppInfo {
+  version: string;
+  settingsFile: string;
+  slotHome: string;
+  dev: boolean;
 }
 
 export interface CoreLocation {

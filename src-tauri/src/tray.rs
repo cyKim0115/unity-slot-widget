@@ -1,26 +1,24 @@
 //! Notification-area icon.
 //!
-//! The widget has no taskbar button, so the tray is where a hidden widget comes back.
-//! Left click shows or hides it; right click opens the menu. The page sends the menu labels in
-//! its language (`set_tray_labels`); until then they are English.
+//! The tray is where a window hidden to the tray comes back. Left click shows or hides it; right
+//! click opens the menu (show the window, settings, quit). The page sends the menu labels in its
+//! language (`set_tray_labels`); until then they are English.
 
 use tauri::{
     menu::{Menu, MenuEvent, MenuItem, PredefinedMenuItem},
     tray::{MouseButton, MouseButtonState, TrayIcon, TrayIconBuilder, TrayIconEvent},
-    AppHandle, Manager, Runtime,
+    AppHandle, Emitter, Manager, Runtime,
 };
 
 const MAIN_LABEL: &str = "main";
 const TRAY_ID: &str = "main";
 const MENU_SHOW: &str = "tray-show";
-const MENU_HIDE: &str = "tray-hide";
 const MENU_SETTINGS: &str = "tray-settings";
 const MENU_QUIT: &str = "tray-quit";
 
 #[derive(Clone, Debug, serde::Deserialize)]
 pub struct TrayLabels {
     pub show: String,
-    pub hide: String,
     pub settings: String,
     pub quit: String,
 }
@@ -28,8 +26,7 @@ pub struct TrayLabels {
 impl Default for TrayLabels {
     fn default() -> Self {
         Self {
-            show: "Show widget".into(),
-            hide: "Hide widget".into(),
+            show: "Show window".into(),
             settings: "Settings".into(),
             quit: "Quit".into(),
         }
@@ -38,15 +35,12 @@ impl Default for TrayLabels {
 
 fn build_menu<R: Runtime, M: Manager<R>>(manager: &M, labels: &TrayLabels) -> tauri::Result<Menu<R>> {
     let show = MenuItem::with_id(manager, MENU_SHOW, &labels.show, true, None::<&str>)?;
-    let hide = MenuItem::with_id(manager, MENU_HIDE, &labels.hide, true, None::<&str>)?;
     let settings = MenuItem::with_id(manager, MENU_SETTINGS, &labels.settings, true, None::<&str>)?;
     let quit = MenuItem::with_id(manager, MENU_QUIT, &labels.quit, true, None::<&str>)?;
     Menu::with_items(
         manager,
         &[
             &show,
-            &hide,
-            &PredefinedMenuItem::separator(manager)?,
             &settings,
             &PredefinedMenuItem::separator(manager)?,
             &quit,
@@ -80,9 +74,10 @@ pub fn set_labels(app: &AppHandle, labels: &TrayLabels) -> Result<(), String> {
 fn on_menu_event(app: &AppHandle, event: MenuEvent) {
     match event.id().as_ref() {
         MENU_SHOW => show_widget(app),
-        MENU_HIDE => hide_widget(app),
         MENU_SETTINGS => {
-            let _ = super::open_settings_window(app.clone());
+            // The settings popup lives in the main window
+            show_widget(app);
+            let _ = app.emit_to(MAIN_LABEL, "open-settings", ());
         }
         MENU_QUIT => app.exit(0),
         _ => {}

@@ -1,7 +1,7 @@
 /*
  * App frame: title bar strips, side panel, list and details columns, banner, status bar, popups.
  * Adapted from https://github.com/cyKim0115/Frond/ @99d89bc, MIT, same author (src/style.css: grid,
- * .col-header, .icon-btn, nav, resizer, caption buttons, banner, status bar, .modal, dialog, menu).
+ * .col-header, .icon-btn, nav, resizer, caption buttons, banner, status bar, .modal, dialog, settings, menu).
  * Changed: the list takes the free width and the details column on the right is the sized one; the
  * banner spans both; the caption buttons sit in a cluster pinned to the top right so they stay when
  * the details column is hidden; colors are tokens only (no literals); no product name in CSS content.
@@ -683,6 +683,293 @@
 }
 .dialog-actions.vertical button {
   text-align: left;
+}
+
+/* ---- settings (settings-dialog.ts): rows are drawn from the schema in src/settings.ts ---- */
+
+#settings-dialog {
+  width: min(680px, calc(100vw - 32px));
+  height: min(540px, calc(100vh - 48px));
+  overflow: hidden;
+}
+#settings-dialog form {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+.modal-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 14px 6px 20px;
+}
+.modal-head h2 {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+}
+/* Category tabs down the left, the chosen tab's items on the right */
+#settings-body {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: 136px minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr);
+  border-top: 1px solid var(--line);
+}
+#settings-tabs {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 10px 8px;
+  background: var(--sidebar-bg);
+  border-right: 1px solid var(--line);
+  overflow: auto;
+}
+#settings-tabs .settings-tab {
+  flex: none;
+  height: 30px;
+  min-width: 0;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 6px;
+  background: none;
+  color: var(--muted);
+  text-align: left;
+  white-space: nowrap;
+  cursor: pointer;
+}
+#settings-tabs .settings-tab[hidden] {
+  display: none;
+}
+#settings-tabs .settings-tab:hover {
+  background: var(--hover);
+  color: var(--fg);
+}
+#settings-tabs .settings-tab[aria-selected="true"] {
+  background: var(--pressed);
+  color: var(--fg);
+  font-weight: 600;
+}
+#settings-tabs .settings-tab:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+#settings-panels {
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.settings-panel {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding: 4px 20px 12px;
+}
+.settings-panel[hidden] {
+  display: none;
+}
+.setting-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 9px 0;
+  border-top: 1px solid var(--line);
+}
+.settings-panel > .setting-row:first-child {
+  border-top: 0;
+}
+/* Paths: the field takes the whole width under its label */
+.setting-row.wide {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 6px;
+}
+.setting-row label {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.setting-label {
+  font-weight: 500;
+}
+.setting-hint {
+  font-size: 12px;
+  color: var(--muted);
+  line-height: 1.45;
+}
+.setting-control {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.setting-control select,
+.setting-control input:not([type="checkbox"]) {
+  height: 28px;
+  padding: 0 8px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--bg);
+  color: var(--fg);
+}
+.setting-control input[type="number"] {
+  width: 84px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.setting-row.wide .setting-control input[type="text"] {
+  flex: 1;
+  min-width: 0;
+  font-family: var(--font-mono);
+  font-size: 12px;
+}
+.setting-control select:focus-visible,
+.setting-control input:not([type="checkbox"]):focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -1px;
+  border-color: var(--accent);
+}
+.setting-unit {
+  min-width: 28px;
+  color: var(--muted);
+  font-size: 12px;
+}
+/* At its default the reset button keeps its place, so the control column does not move */
+.modal .setting-reset[hidden] {
+  display: inline-grid;
+  visibility: hidden;
+}
+.setting-reset-space {
+  flex: none;
+  width: 22px;
+}
+/* On/off items: a switch */
+.switch {
+  appearance: none;
+  position: relative;
+  flex: none;
+  width: 34px;
+  height: 20px;
+  margin: 0;
+  border: 1px solid var(--muted);
+  border-radius: 10px;
+  background: var(--bg);
+  cursor: pointer;
+  transition: background-color 120ms, border-color 120ms;
+}
+.switch::before {
+  content: "";
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--muted);
+  transition: transform 120ms var(--panel-ease);
+}
+.switch:checked {
+  border-color: var(--accent);
+  background: var(--accent);
+}
+.switch:checked::before {
+  transform: translateX(14px);
+  background: var(--on-accent);
+}
+.switch:disabled {
+  cursor: default;
+  opacity: 0.5;
+}
+.switch:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+@media (prefers-reduced-motion: reduce) {
+  .switch,
+  .switch::before {
+    transition: none;
+  }
+}
+/* Panels the schema cannot draw (settings-panels.ts) */
+.setting-facts {
+  margin: 0;
+  padding: 6px 0 10px;
+}
+.setting-facts p {
+  margin: 0 0 4px;
+}
+.setting-path {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  overflow-wrap: anywhere;
+  user-select: text;
+}
+.setting-list {
+  margin: 4px 0 0;
+  padding-left: 18px;
+}
+.about-facts {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  gap: 6px 16px;
+  padding-top: 10px;
+}
+.about-facts dt {
+  color: var(--muted);
+}
+.about-facts dd {
+  margin: 0;
+}
+.modal button.link-btn {
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--accent);
+  font-size: 12px;
+  text-decoration: underline;
+  cursor: pointer;
+}
+.modal button.link-btn:hover {
+  background: none;
+}
+.modal-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 20px 16px;
+  border-top: 1px solid var(--line);
+}
+.modal-note {
+  font-size: 12px;
+  color: var(--muted);
+}
+/* A narrow window: the tabs run across the top */
+@media (max-width: 559px) {
+  #settings-body {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto minmax(0, 1fr);
+  }
+  #settings-tabs {
+    flex-direction: row;
+    overflow-x: auto;
+    padding: 6px 8px;
+    border-right: 0;
+    border-bottom: 1px solid var(--line);
+  }
+  .settings-panel {
+    padding: 4px 14px 10px;
+  }
+  .setting-row:not(.wide) {
+    flex-wrap: wrap;
+  }
+  .modal-foot {
+    padding: 10px 14px 12px;
+  }
 }
 
 /* ---- menus (context-menu.ts): a popover in the top layer, placed by left/top ---- */

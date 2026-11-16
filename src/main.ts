@@ -33,9 +33,21 @@ import { initNav } from "./shell/nav";
 import { isString, readPref, writePref } from "./shell/prefs";
 import { initBodyResize } from "./shell/resize";
 import { fitStatusbar, flashStatus, setStatusPath } from "./shell/statusbar";
-import { initTheme, isThemeChoice, oppositeChoice } from "./shell/theme";
+import { initSettingsDialog } from "./shell/settings-dialog";
+import { initTheme, oppositeChoice } from "./shell/theme";
 import { initTitlebar } from "./shell/titlebar";
-import type { Dashboard, DashboardResult, GitState, OpenResult, OpenTarget, Slot, WidgetSettings } from "./types";
+import {
+  type CategoryId,
+  getSettings,
+  onSettingsChange,
+  onSettingsSaveError,
+  patchSettings,
+  receiveSettings,
+  SETTING_KEYS,
+  type SettingKey,
+} from "./settings";
+import { aboutPanel, autostartPanel, branchViewPanel, corePanel } from "./settings-panels";
+import type { AppInfo, Dashboard, DashboardResult, GitState, OpenResult, OpenTarget, Slot, WidgetSettings } from "./types";
 import { SUPPORTED_SCHEMA_MAJOR } from "./types";
 import { esc, slotList, type RowContext } from "./view";
 
@@ -46,7 +58,9 @@ type SlotFilter = "all" | "open" | "attention";
 const isFilter = (v: unknown): v is SlotFilter => v === "all" || v === "open" || v === "attention";
 const isStringOrNull = (v: unknown): v is string | null => v === null || typeof v === "string";
 
-let settings: WidgetSettings;
+/** The settings in effect (src/settings.ts keeps them; this is its latest copy). */
+let settings: WidgetSettings = getSettings();
+let appInfo: AppInfo | null = null;
 let doc: Dashboard | null = null;
 let receivedAt = 0;
 let lastResult: DashboardResult | null = null;
@@ -86,6 +100,7 @@ const narrowQuery = matchMedia("(max-width: 719px)");
 const nav = initNav(overlayQuery);
 const titlebar = initTitlebar(inTauri);
 const theme = initTheme();
+const settingsDialog = initSettingsDialog();
 
 function gitOf(slot: Slot): GitState | null {
   return mergeGit(slot.git, fullGit.get(slot.name));
@@ -660,13 +675,12 @@ function slotMenu(slot: Slot): MenuEntry[] {
   return entries;
 }
 
-function openSettings() {
-  // The in-app settings popup replaces this window later; one place to change
-  void call("open_settings_window").catch(() => {});
+function openSettings(category?: CategoryId) {
+  settingsDialog.open(category);
 }
 
 function onTop(): boolean {
-  return settings.windowOnTop ?? false;
+  return settings.windowOnTop;
 }
 
 function appMenu(): MenuEntry[] {
@@ -682,7 +696,7 @@ function appMenu(): MenuEntry[] {
     { label: t("menu.onTop"), checked: onTop(), action: () => void setOnTop(!onTop()) },
     { label: t("menu.theme"), shortcut: "Ctrl+Shift+D", action: () => void toggleTheme() },
     "separator",
-    { label: t("menu.settings"), shortcut: "Ctrl+,", action: openSettings },
+    { label: t("menu.settings"), shortcut: "Ctrl+,", action: () => openSettings() },
     { label: t("menu.quit"), danger: true, action: () => void call("quit_app") },
   ];
 }
@@ -707,18 +721,6 @@ async function showExtraDialog() {
 
 // ---------------------------------------------------------------- settings
 
-/** Applies a change at once, then stores only the changed keys (update_settings merges into widget.json). */
-async function patchSettings(patch: Partial<WidgetSettings>) {
-  await applySettings({ ...settings, ...patch }, false);
-  render();
-  try {
-    const saved = await call<WidgetSettings | null>("update_settings", { patch });
-    if (saved) await applySettings(saved, false);
-  } catch (e) {
-    flashStatus(t("status.saveFailed", { text: String(e) }), 5000);
-  }
-}
-
 async function toggleTheme() {
   const next = oppositeChoice(theme.base());
   flashStatus(t(next === "dark" ? "theme.dark" : "theme.light"));
@@ -726,8 +728,8 @@ async function toggleTheme() {
 }
 
 async function setOnTop(on: boolean) {
-  await patchSettings({ windowOnTop: on });
   flashStatus(t(on ? "status.onTopOn" : "status.onTopOff"));
+  await patchSettings({ windowOnTop: on });
 }
 
 function applyTexts() {
@@ -735,28 +737,49 @@ function applyTexts() {
   titlebar.relabel();
   nav.relabel();
   relabelBanner();
+  settingsDialog.relabel();
   void call("set_tray_labels", {
-    labels: { show: t("tray.show"), hide: t("tray.hide"), settings: t("tray.settings"), quit: t("tray.quit") },
+    labels: { show: t("tray.show"), settings: t("tray.settings"), quit: t("tray.quit") },
   }).catch(() => {});
 }
 
-async function applySettings(next: WidgetSettings, first: boolean) {
-  const wasOnTop = first ? null : onTop();
-  settings = next;
+const corePart = corePanel((text) => flashStatus(text, 5000));
+
+/** Parts of the settings popup the schema cannot draw; each reads its state when the popup opens. */
+function addSettingsPanels() {
+  const onError = (text: string) => flashStatus(text, 5000);
+  const parts = [
+    { part: autostartPanel(() => appInfo, onError), category: "general", after: "windowOnTop" },
+    { part: corePart, category: "core", after: "unitySlotScript" },
+    { part: branchViewPanel(() => doc), category: "branchView" },
+    { part: aboutPanel(() => appInfo, () => doc, onError), category: "about" },
+  ] as const;
+  for (const { part, category, ...rest } of parts) {
+    settingsDialog.addPanel(category, part.element, "after" in rest ? rest.after : undefined);
+    settingsDialog.onOpen(part.refresh);
+  }
+}
+
+/**
+ * Settings changed: here, after a save, or in widget.json. The window pin and the quick signal
+ * interval are applied by the Rust side when it saves; the page applies the rest.
+ */
+function onSettingsChanged(changed: SettingKey[], first = false) {
+  settings = getSettings();
   const lang = resolveLang(settings.language);
   if (first || lang !== currentLang()) {
     setLang(lang);
     applyTexts();
   }
-  theme.apply(isThemeChoice(settings.theme) ? settings.theme : "system", settings.themeDurationMs ?? 250);
+  if (first || changed.includes("theme") || changed.includes("themeDurationMs")) theme.apply(settings.theme, settings.themeDurationMs);
   $("pin-btn").setAttribute("aria-pressed", String(onTop()));
-  if (wasOnTop !== onTop()) {
-    try {
-      await call("set_always_on_top", { enabled: onTop() });
-    } catch {
-      /* browser preview */
-    }
+  if (first) return;
+  if ((changed.includes("idleSecs") || changed.includes("startingSecs")) && !running) schedule();
+  if (changed.includes("unitySlotScript") || changed.includes("sampleFile")) {
+    if (settingsDialog.isOpen()) corePart.refresh();
+    void refresh(true);
   }
+  render();
 }
 
 // ---------------------------------------------------------------- events
@@ -787,7 +810,7 @@ async function onActionClick(e: MouseEvent): Promise<boolean> {
       void refresh(true);
       break;
     case "settings":
-      openSettings();
+      openSettings("core");
       break;
     case "unity":
       if (slot) void unitySlot(slot);
@@ -902,7 +925,7 @@ function bindEvents() {
     if (isContextMenuOpen()) hideContextMenu();
     else showMenuBelow(button, appMenu());
   });
-  $("settings-btn").addEventListener("click", openSettings);
+  $("settings-btn").addEventListener("click", () => openSettings());
 
   $("status-path").addEventListener("click", () => {
     const slot = selectedSlot();
@@ -918,7 +941,7 @@ function bindEvents() {
   );
   $("status-git").addEventListener("click", () => void refresh(true));
   $("status-extra").addEventListener("click", () => void showExtraDialog());
-  $("status-core").addEventListener("click", openSettings);
+  $("status-core").addEventListener("click", () => openSettings("core"));
 
   setBannerFocusHome(() => $("list").focus());
   initBodyResize({ fold: () => setBodyOpen(false) });
@@ -974,7 +997,7 @@ function bindEvents() {
     { keys: "Ctrl+Shift+C", run: () => void copyCleanup(), inFields: true },
     { keys: "F5", run: () => void refresh(false), inFields: true },
     { keys: "Shift+F5", run: () => void refresh(true), inFields: true },
-    { keys: "Ctrl+,", run: openSettings, inFields: true },
+    { keys: "Ctrl+,", run: () => openSettings(), inFields: true },
     { keys: "Ctrl+Shift+D", run: () => void toggleTheme(), inFields: true },
   ]);
 
@@ -1008,7 +1031,16 @@ async function boot() {
   if (!inTauri) applyPreviewQuery();
   app.dataset.body = bodyOpen ? "open" : "hidden";
   selectView(view);
-  await applySettings(await call<WidgetSettings>("get_settings"), true);
+  receiveSettings(await call<WidgetSettings>("get_settings").catch(() => null));
+  appInfo = await call<AppInfo>("get_app_info").catch(() => null);
+  addSettingsPanels();
+  onSettingsChanged(SETTING_KEYS, true);
+  onSettingsChange((changed) => onSettingsChanged(changed));
+  onSettingsSaveError((error) => {
+    flashStatus(t("status.saveFailed", { text: error }), 5000);
+    // What the file holds now decides what the screen shows
+    void call<WidgetSettings>("get_settings").then(receiveSettings).catch(() => {});
+  });
   bindEvents();
   render();
   // The saved widths and open states paint without animation; then panels animate
@@ -1016,11 +1048,8 @@ async function boot() {
 
   await on("slot-signal", onSignal);
   await on("widget-shown", () => void refresh(false));
-  await on<WidgetSettings>("settings-saved", async (payload) => {
-    await applySettings(payload, false);
-    render();
-    schedule();
-  });
+  // The tray menu's Settings
+  await on("open-settings", () => openSettings());
 
   window.setInterval(tick, 1000);
   void refresh(true);

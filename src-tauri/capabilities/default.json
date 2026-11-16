@@ -1,7 +1,7 @@
 {
   "identifier": "default",
-  "description": "Widget and settings windows",
-  "windows": ["main", "settings"],
+  "description": "The main window (the settings popup lives in it)",
+  "windows": ["main"],
   "permissions": [
     "core:default",
     "core:window:allow-start-dragging",

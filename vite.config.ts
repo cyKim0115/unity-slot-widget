@@ -10,14 +10,6 @@ export default defineConfig(async () => ({
   // Copied as they are. theme-boot.js runs before the first paint (a classic script; the CSP allows only 'self').
   // Under src/ so scripts/launch-user.ps1 sees a change and rebuilds.
   publicDir: "src/public",
-  build: {
-    rollupOptions: {
-      input: {
-        main: "index.html",
-        settings: "settings.html",
-      },
-    },
-  },
   server: {
     port: 1431,
     strictPort: true,

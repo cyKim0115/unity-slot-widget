@@ -146,6 +146,10 @@ fn file() -> PathBuf {
     paths::slot_home().join("widget.json")
 }
 
+pub fn file_path() -> String {
+    file().display().to_string()
+}
+
 /// True when `value` can stand for `key` (right type); checked one key at a time.
 fn fits(key: &str, value: &Value) -> bool {
     let mut one = Map::new();

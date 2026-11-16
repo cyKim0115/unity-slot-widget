@@ -7,11 +7,10 @@ mod signals;
 mod tray;
 
 use settings::WidgetSettings;
-use tauri::{Emitter, Manager, WindowEvent};
+use tauri::Manager;
 use tauri_plugin_window_state::StateFlags;
 
 const MAIN_LABEL: &str = "main";
-const SETTINGS_LABEL: &str = "settings";
 
 #[tauri::command]
 fn get_settings() -> WidgetSettings {
@@ -27,29 +26,30 @@ fn update_settings(app: tauri::AppHandle, patch: serde_json::Map<String, serde_j
     Ok(saved)
 }
 
-/// The old settings window sends everything it holds; only the changed keys reach the file.
-#[tauri::command]
-fn save_settings(app: tauri::AppHandle, settings: WidgetSettings) -> Result<WidgetSettings, String> {
-    let current = serde_json::to_value(settings::load()).map_err(|e| e.to_string())?;
-    let next = serde_json::to_value(&settings).map_err(|e| e.to_string())?;
-    let mut patch = serde_json::Map::new();
-    if let (serde_json::Value::Object(current), serde_json::Value::Object(next)) = (current, next) {
-        for (key, value) in next {
-            if current.get(&key) != Some(&value) {
-                patch.insert(key, value);
-            }
-        }
-    }
-    let saved = settings::update(&patch)?;
-    apply_saved(&app, &saved);
-    app.emit("settings-saved", saved.clone()).map_err(|e| e.to_string())?;
-    Ok(saved)
-}
-
 fn apply_saved(app: &tauri::AppHandle, saved: &WidgetSettings) {
     signals::set_interval(saved.signal_secs);
     if let Some(window) = app.get_webview_window(MAIN_LABEL) {
         let _ = window.set_always_on_top(saved.window_on_top);
+    }
+}
+
+/// What the settings About tab shows.
+#[derive(serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+struct AppInfo {
+    version: String,
+    settings_file: String,
+    slot_home: String,
+    dev: bool,
+}
+
+#[tauri::command]
+fn get_app_info(app: tauri::AppHandle) -> AppInfo {
+    AppInfo {
+        version: app.package_info().version.to_string(),
+        settings_file: settings::file_path(),
+        slot_home: paths::slot_home().display().to_string(),
+        dev: cfg!(debug_assertions),
     }
 }
 
@@ -111,31 +111,6 @@ fn quit_app(app: tauri::AppHandle) {
 }
 
 #[tauri::command]
-fn open_settings_window(app: tauri::AppHandle) -> Result<(), String> {
-    let window = app
-        .get_webview_window(SETTINGS_LABEL)
-        .ok_or_else(|| "settings window not found".to_string())?;
-    window.show().map_err(|e| e.to_string())?;
-    window.unminimize().map_err(|e| e.to_string())?;
-    window.set_focus().map_err(|e| e.to_string())?;
-    window.emit("settings-open", ()).map_err(|e| e.to_string())?;
-    Ok(())
-}
-
-#[tauri::command]
-fn close_settings_window(app: tauri::AppHandle) -> Result<(), String> {
-    if let Some(window) = app.get_webview_window(SETTINGS_LABEL) {
-        window.hide().map_err(|e| e.to_string())?;
-    }
-    Ok(())
-}
-
-#[tauri::command]
-fn is_dev_build() -> bool {
-    cfg!(debug_assertions)
-}
-
-#[tauri::command]
 fn enable_autostart() -> Result<(), String> {
     install::enable()
 }
@@ -170,14 +145,6 @@ fn resize_main_window(app: tauri::AppHandle, height: f64) -> Result<(), String> 
     Ok(())
 }
 
-#[tauri::command]
-fn set_always_on_top(app: tauri::AppHandle, enabled: bool) -> Result<(), String> {
-    let window = app
-        .get_webview_window(MAIN_LABEL)
-        .ok_or_else(|| "main window not found".to_string())?;
-    window.set_always_on_top(enabled).map_err(|e| e.to_string())
-}
-
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -185,13 +152,12 @@ pub fn run() {
         .plugin(
             tauri_plugin_window_state::Builder::default()
                 .with_state_flags(StateFlags::POSITION)
-                .with_denylist(&[SETTINGS_LABEL])
                 .build(),
         )
         .invoke_handler(tauri::generate_handler![
             get_settings,
             update_settings,
-            save_settings,
+            get_app_info,
             get_core_location,
             get_dashboard,
             open_folder,
@@ -201,14 +167,10 @@ pub fn run() {
             focus_editor,
             set_tray_labels,
             quit_app,
-            open_settings_window,
-            close_settings_window,
-            is_dev_build,
             enable_autostart,
             disable_autostart,
             is_autostart_enabled,
-            resize_main_window,
-            set_always_on_top
+            resize_main_window
         ])
         .setup(|app| {
             tray::install(app)?;
@@ -220,16 +182,6 @@ pub fn run() {
             signals::set_interval(s.signal_secs);
             signals::start(app.handle().clone());
             Ok(())
-        })
-        .on_window_event(|window, event| {
-            if let WindowEvent::CloseRequested { api, .. } = event {
-                if window.label() == SETTINGS_LABEL {
-                    // The close box is the same as Cancel; the window is reused.
-                    api.prevent_close();
-                    let _ = window.emit("settings-cancelled", ());
-                    let _ = window.hide();
-                }
-            }
         })
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

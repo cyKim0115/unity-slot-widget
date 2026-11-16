@@ -16,30 +16,15 @@ export const inTauri = typeof (window as unknown as { __TAURI_INTERNALS__?: unkn
 const query = new URLSearchParams(location.search);
 const previewTheme = query.get("theme");
 
+/** Stands in for widget.json; keys left out take their defaults (src/settings.ts). */
 const PREVIEW_SETTINGS: Record<string, unknown> = {
   language: query.get("lang") ?? "auto",
-  alwaysOnTop: true,
-  idleSecs: 30,
-  startingSecs: 5,
-  gitFullMins: 5,
-  signalSecs: 3,
-  commitWarnPercent: 85,
-  commitCriticalPercent: 90,
-  slotMemoryWarnGb: 10,
-  localOnlyWarnDays: 3,
-  localOnlyCriticalDays: 14,
-  openTarget: "fork",
-  unitySlotScript: "",
-  sampleFile: "",
   theme: previewTheme === "light" || previewTheme === "dark" ? previewTheme : "system",
-  themeDurationMs: 250,
-  windowOnTop: false,
 };
 
 async function preview(cmd: string, args?: Record<string, unknown>): Promise<unknown> {
   switch (cmd) {
     case "get_settings":
-    case "save_settings":
       return { ...PREVIEW_SETTINGS };
     case "update_settings":
       // Same answer as the Rust side: the whole settings after merging the changed keys
@@ -53,9 +38,10 @@ async function preview(cmd: string, args?: Record<string, unknown>): Promise<unk
     }
     case "get_core_location":
       return { script: null, source: "none", slotHome: "(preview)" };
+    case "get_app_info":
+      return { version: "0.0.0-preview", settingsFile: "(preview)\widget.json", slotHome: "(preview)", dev: true };
     case "open_in_unity":
       return { outcome: "started", pid: null, warnings: [] };
-    case "is_dev_build":
     case "is_autostart_enabled":
       return false;
     default:

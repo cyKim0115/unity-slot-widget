@@ -129,6 +129,23 @@
         </form>
       </dialog>
 
+      <!-- Settings (src/shell/settings-dialog.ts): tabs and items come from src/settings.ts -->
+      <dialog id="settings-dialog" class="modal" aria-labelledby="settings-title">
+        <form method="dialog">
+          <header class="modal-head">
+            <h2 id="settings-title" data-t="settings.title"></h2>
+            <button class="icon-btn small" type="submit" value="close" data-t-title="settings.close" data-t-aria="settings.close">
+              <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M4.5 4.5l7 7M11.5 4.5l-7 7" /></svg>
+            </button>
+          </header>
+          <div id="settings-body"></div>
+          <footer class="modal-foot">
+            <span class="modal-note" data-t="settings.note"></span>
+            <button id="settings-reset" type="button" data-t="settings.resetAll"></button>
+          </footer>
+        </form>
+      </dialog>
+
       <div id="context-menu" popover role="menu"></div>
     </div>
   </body>
