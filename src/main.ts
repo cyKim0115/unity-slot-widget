@@ -15,7 +15,6 @@
  */
 
 import { call, inTauri, isWindowVisible, on } from "./backend";
-import { setGlassBlur, setGlassClass, onGlassFrame, type GlassFrame } from "./glass";
 import { currentLang, formatClock, formatDuration, formatWhen, resolveLang, setLang, t } from "./i18n";
 import { icon } from "./icons";
 import { cleanupRequest, elapsedSince, isOpen, mergeGit, nowFor, warnings } from "./model";
@@ -470,8 +469,6 @@ async function applySettings(next: WidgetSettings, first: boolean) {
   }
   try {
     await call("set_always_on_top", { enabled: settings.alwaysOnTop });
-    await call("set_glass_blur", { px: settings.glassBlur });
-    setGlassClass(await call<boolean>("set_glass", { enabled: settings.glass }));
   } catch {
     /* browser preview */
   }
@@ -550,9 +547,6 @@ async function boot() {
     render();
     schedule();
   });
-  await on<boolean>("glass-applied", (payload) => setGlassClass(payload));
-  await on<number>("glass-blur", (payload) => setGlassBlur(payload));
-  await on<GlassFrame>("glass-frame", (payload) => onGlassFrame(payload));
   void document.fonts?.ready.then(() => {
     fitHeight();
     updateFade();

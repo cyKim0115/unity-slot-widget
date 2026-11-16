@@ -161,8 +161,6 @@ export type OpenTarget = (typeof OPEN_TARGETS)[number];
 export interface WidgetSettings {
   language: "auto" | "ko" | "en";
   alwaysOnTop: boolean;
-  glass: boolean;
-  glassBlur: number;
   idleSecs: number;
   startingSecs: number;
   gitFullMins: number;

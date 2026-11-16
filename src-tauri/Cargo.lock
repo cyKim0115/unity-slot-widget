@@ -3657,7 +3657,6 @@ dependencies = [
  "tauri-build",
  "tauri-plugin-window-state",
  "windows 0.61.3",
- "windows-version",
  "winreg 0.55.0",
 ]
 

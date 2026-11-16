@@ -1,5 +1,4 @@
 mod core;
-mod glass;
 mod install;
 mod open;
 mod paths;
@@ -151,29 +150,6 @@ fn set_always_on_top(app: tauri::AppHandle, enabled: bool) -> Result<(), String>
     window.set_always_on_top(enabled).map_err(|e| e.to_string())
 }
 
-/// Background blur: capture behind the widget and blur it in CSS (see glass.rs).
-#[tauri::command]
-fn set_glass(app: tauri::AppHandle, enabled: bool) -> Result<bool, String> {
-    let window = app
-        .get_webview_window(MAIN_LABEL)
-        .ok_or_else(|| "main window not found".to_string())?;
-    let applied = glass::apply(&window, enabled);
-    window.emit("glass-applied", applied).map_err(|e| e.to_string())?;
-    Ok(applied)
-}
-
-#[tauri::command]
-fn set_glass_blur(app: tauri::AppHandle, px: f64) -> Result<(), String> {
-    glass::set_blur(px);
-    app.emit_to(MAIN_LABEL, "glass-blur", px.clamp(0.0, glass::MAX_BLUR_PX))
-        .map_err(|e| e.to_string())
-}
-
-#[tauri::command]
-fn glass_supported() -> bool {
-    glass::supported()
-}
-
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -184,9 +160,6 @@ pub fn run() {
                 .with_denylist(&[SETTINGS_LABEL])
                 .build(),
         )
-        .register_uri_scheme_protocol("glassbg", |ctx, request| {
-            glass::frame_response(ctx.webview_label(), request)
-        })
         .invoke_handler(tauri::generate_handler![
             get_settings,
             save_settings,
@@ -206,10 +179,7 @@ pub fn run() {
             disable_autostart,
             is_autostart_enabled,
             resize_main_window,
-            set_always_on_top,
-            set_glass,
-            set_glass_blur,
-            glass_supported
+            set_always_on_top
         ])
         .setup(|app| {
             tray::install(app)?;
@@ -223,12 +193,6 @@ pub fn run() {
             Ok(())
         })
         .on_window_event(|window, event| {
-            if window.label() == MAIN_LABEL {
-                if matches!(event, WindowEvent::Moved(_) | WindowEvent::Resized(_)) {
-                    glass::wake();
-                }
-                return;
-            }
             if let WindowEvent::CloseRequested { api, .. } = event {
                 if window.label() == SETTINGS_LABEL {
                     // The close box is the same as Cancel; the window is reused.

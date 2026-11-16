@@ -13,8 +13,6 @@ export const inTauri = typeof (window as unknown as { __TAURI_INTERNALS__?: unkn
 const PREVIEW_SETTINGS = {
   language: new URLSearchParams(location.search).get("lang") ?? "auto",
   alwaysOnTop: true,
-  glass: false,
-  glassBlur: 12,
   idleSecs: 30,
   startingSecs: 5,
   gitFullMins: 5,
@@ -44,8 +42,6 @@ async function preview(cmd: string): Promise<unknown> {
       return { script: null, source: "none", slotHome: "(preview)" };
     case "open_in_unity":
       return { outcome: "started", pid: null, warnings: [] };
-    case "set_glass":
-    case "glass_supported":
     case "is_dev_build":
     case "is_autostart_enabled":
       return false;

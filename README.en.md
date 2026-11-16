@@ -152,7 +152,6 @@ Open them from the tray icon or the widget's right-click menu. They are saved to
 | Always on top | On | Above other windows |
 | Program for right-click → Open | **Fork** | Command Prompt, Git Bash, Cursor, VS Code, File Explorer |
 | Start with Windows | **Off** | Only in the installed app |
-| Background blur | Off | Captures the screen behind the widget and blurs it. While it captures, the widget is left out of screenshots |
 | Full check interval / while starting | 30 s / 5 s | |
 | Detailed git check interval | 5 min | |
 | Quick check interval | 3 s | |

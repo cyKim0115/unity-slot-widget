@@ -15,7 +15,7 @@ const NUMBER_FIELDS = [
   "localOnlyCriticalDays",
 ] as const;
 const TEXT_FIELDS = ["unitySlotScript", "sampleFile"] as const;
-const BOOL_FIELDS = ["alwaysOnTop", "glass"] as const;
+const BOOL_FIELDS = ["alwaysOnTop"] as const;
 
 let loaded: WidgetSettings;
 
@@ -35,11 +35,6 @@ function applyTexts() {
   const close = document.getElementById("titlebar-close")!;
   close.title = t("settings.close");
   close.setAttribute("aria-label", t("settings.close"));
-  updateBlurLabel();
-}
-
-function updateBlurLabel() {
-  document.getElementById("glassBlurLabel")!.textContent = t("settings.glassBlur", { px: input("glassBlur").value });
 }
 
 async function showLocation() {
@@ -60,7 +55,6 @@ function fill(s: WidgetSettings) {
   for (const key of BOOL_FIELDS) input(key).checked = s[key];
   for (const key of NUMBER_FIELDS) input(key).value = String(s[key]);
   for (const key of TEXT_FIELDS) input(key).value = s[key];
-  input("glassBlur").value = String(s.glassBlur);
 }
 
 function read(): WidgetSettings {
@@ -74,7 +68,6 @@ function read(): WidgetSettings {
     if (Number.isFinite(v)) s[key] = v;
   }
   for (const key of TEXT_FIELDS) s[key] = input(key).value.trim();
-  s.glassBlur = Number(input("glassBlur").value);
   return s;
 }
 
@@ -90,10 +83,6 @@ async function load() {
   autostart.disabled = dev;
   document.getElementById("autostart-hint")!.classList.toggle("hidden", !dev);
   autostart.checked = await call<boolean>("is_autostart_enabled").catch(() => false);
-
-  const glassOk = await call<boolean>("glass_supported").catch(() => false);
-  input("glass").disabled = !glassOk;
-  document.getElementById("glass-hint")!.classList.toggle("hidden", glassOk);
 }
 
 async function save() {
@@ -133,7 +122,6 @@ function initTitlebar() {
 
 async function boot() {
   initTitlebar();
-  input("glassBlur").addEventListener("input", updateBlurLabel);
   input("autostart").addEventListener("change", async () => {
     const box = input("autostart");
     box.disabled = true;

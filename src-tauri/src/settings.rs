@@ -13,8 +13,6 @@ pub struct WidgetSettings {
     /// auto | ko | en
     pub language: String,
     pub always_on_top: bool,
-    pub glass: bool,
-    pub glass_blur: f64,
     /// Seconds between full refreshes while nothing is starting.
     pub idle_secs: u64,
     /// Seconds between full refreshes while an editor is starting.
@@ -41,8 +39,6 @@ impl Default for WidgetSettings {
         Self {
             language: "auto".into(),
             always_on_top: true,
-            glass: false,
-            glass_blur: crate::glass::DEFAULT_BLUR_PX,
             idle_secs: 30,
             starting_secs: 5,
             git_full_mins: 5,
@@ -67,7 +63,6 @@ impl WidgetSettings {
         self.signal_secs = self.signal_secs.clamp(1, 60);
         self.commit_warn_percent = self.commit_warn_percent.clamp(50, 99);
         self.commit_critical_percent = self.commit_critical_percent.clamp(self.commit_warn_percent, 100);
-        self.glass_blur = self.glass_blur.clamp(0.0, crate::glass::MAX_BLUR_PX);
         if !matches!(self.language.as_str(), "auto" | "ko" | "en") {
             self.language = "auto".into();
         }
