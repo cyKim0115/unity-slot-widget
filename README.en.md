@@ -7,61 +7,120 @@
 ![Tauri 2](https://img.shields.io/badge/Tauri-2-3f6150)
 ![View · open](https://img.shields.io/badge/mode-view%20%C2%B7%20open-96bea1)
 
-A small desktop widget for [unity-slot](https://github.com/cyKim0115/unity-slot). For each Unity clone (slot) it shows at a glance:
+A desktop app for [unity-slot](https://github.com/cyKim0115/unity-slot). For each Unity clone (slot) it shows at a glance:
 
-- whether the editor is open, starting or closed
-- who holds a lease
-- how much memory the editor tree uses
-- git work that exists only on this PC
+- whether the editor is open, starting or closed, who holds a lease, and how much memory it uses
+- git work that exists only on this PC (commits on no remote, branches without an upstream, stashes, uncommitted changes)
+- whether a branch with the same name in several clones is the same, only needs a pull, or has diverged
 
 <p align="center">
-  <img src="docs/assets/widget-en.png" width="400" alt="Unity Slot Widget: eight slot cards from two projects, MyGame and Popup, with a warning band about commits on no remote at the top">
+  <img src="docs/assets/app-slots-dark.png" width="800" alt="The slot screen in the dark theme: the side panel on the left with open counts and a summary for the MyGame and Popup projects, the slot list by project in the middle, the details of the selected MyGame-1 on the right (path, Unity, memory, lease, git), and the status bar at the bottom">
 </p>
 
-The widget never closes or leases a slot. The one thing that starts an editor is a slot card's right-click → **Open in Unity**, and even that only calls unity-slot's `open -NoWait`, so the core makes the checks and starts the editor its own way. `unity-slot dashboard -Json` makes every other decision and the widget draws that document. The screenshots use [sample data](samples/).
+The app never closes or leases a slot. The only thing that starts an editor is **Open in Unity**, and it only calls unity-slot `open -NoWait`, so the core decides the checks before opening and how the editor is started. Every judgment comes from `unity-slot dashboard -Json`; the app draws that document. The screenshots use the [sample data](samples/) (Korean UI).
 
-## What it shows
+## Layout
 
-| Where | What |
+The window has three columns and a status bar. The app draws its own title bar (drag an empty spot to move, double-click to maximize, snap to screen edges).
+
+| Area | Contents |
 |---|---|
-| Header | Open editors / maximum (`maxEditors`), system commit % (85% warning, 90% critical) |
-| Warning band | An editor open without a lease, an expired lease on an open editor, a stalled start, an unsaved scene, old local-only commits, and more. Click to see them all |
-| Slot card | State dot, name, platform, always-on / user / worktree tags, branch, state and time, lease, memory, git marks |
-| Footer | Updated time, next check, last fetch, unregistered editors and orphan workers, unity-slot version |
+| Side panel (left) | Three tabs. **Projects**: open count, clone count, fetch range and viewing repository state per project, plus a summary (editors, system commit, free memory, unregistered editors). **Warnings**: critical, attention and info items, and Copy cleanup request. **Log**: recent events (a click selects that slot) |
+| List (middle) | Tabs at the top switch between the **Slots** screen and the **Branches** screen. Project picker, search and filter chips |
+| Details (right) | Details of the selected item, with a row of action buttons on top. Drag the edge to change its width |
+| Banner | Only the one thing a person should handle now (a stalled start, commit charge critical, a core error) |
+| Status bar | Selected path, warning count, editors open/max, system commit %, refresh time and next refresh, last detailed git, oldest fetch, unregistered editors, core version. Less important items drop out first when it is narrow |
 
-**State dot:** ● ready · ◐ starting · red ● stalled · ○ closed · ■ batch · dim ● open (started by the Hub, readiness unknown) · dashed ○ path missing
+Below 1000px the side panel opens over the list; below 720px the details open as a sheet below. The minimum size is 400x300.
 
-**git marks:**
+### Slots screen
+
+Two lines per slot. Line 1: status dot, name, platform, permanent/user/worktree marks, memory. Line 2: branch, state and time, lease, git marks. When slots open or close and the order changes, rows slide to their new place, and a slot glows once when it opens or becomes ready.
+
+**Status dots:** ● ready · ◐ starting · red ● stalled · ○ closed · ■ batch · dim ● open (opened from Hub, readiness unknown) · dashed ○ path missing
+
+**Git marks:**
 
 | Mark | Meaning |
 |---|---|
-| `● 12` | Uncommitted changes |
-| `↑ 1` · `↓ 2` | Ahead of / behind upstream (as of the last fetch) |
-| crossed cloud `103` | Commits on no remote; amber after 3 days, red after 14 |
-| branch `10` | Branches without an upstream |
-| broken link `1` | Branches whose upstream is gone |
-| box `1` | Stashes |
+| `● 12` | uncommitted changes |
+| `↑ 1` · `↓ 2` | ahead of / behind the upstream (as of the last fetch) |
+| struck-through cloud `103` | commits on no remote; amber when old (3 days), red (14 days) |
+| branch `10` | branches without an upstream |
+| broken link `1` | branches whose upstream is gone |
+| box `1` | stashes |
 
-Click a card to open its details. You get the path (open folder, open log, copy path), the Unity version and how it was started, time to ready, the memory breakdown, the lease period, git details, and the last open and close.
-
-<p align="center">
-  <img src="docs/assets/widget-details.png" width="400" alt="The MyGame-WebGL card opened: path, Unity 6000.6.0f1 direct standby 1, memory breakdown, lease codex:web-fix and git state in a small table">
-  &nbsp;
-  <img src="docs/assets/widget-states.png" width="400" alt="Several states: a system commit 92% warning, a stalled start in red, an expired lease, a batch run and a missing path">
-</p>
-
-The right-click menu has Settings, Refresh, **Copy cleanup request**, Recent events and Quit. Copy cleanup request puts a Markdown checklist of the items that need attention on the clipboard: commits on no remote, branches without an upstream, stashes, editors open without a lease. Paste it into any agent session; the agent asks what to do with each item and does only what you approve.
-
-Right-click a slot card for **Open in Unity**, **Open** and Show in Explorer.
-
-- **Open in Unity** starts the slot's editor. It calls `unity-slot open <slot> -NoWait`, so the core's checks (already open, batchmode run, held `Temp\UnityLockfile`, Unity version not installed), its WMI launch and its capacity warnings all apply. No platform (`-BuildTarget`) is passed. On an open slot it becomes **Show Unity window** and brings that window to the front. It is off for a closed slot someone else leased, a slot whose folder is missing and a slot in a batchmode run. It takes no lease, so an on-demand slot opened from the widget shows "open without a lease".
-- **Open** opens the slot folder in Fork by default; Settings can switch it to Command Prompt, Git Bash, Cursor, VS Code or File Explorer.
-
-With a light system theme the widget turns light too. The text comes in Korean and English and follows the system language by default.
+### Branches screen
 
 <p align="center">
-  <img src="docs/assets/widget-light.png" width="400" alt="The widget in the light theme: the same slot list on a light background with blue accents">
+  <img src="docs/assets/app-branches-light.png" width="800" alt="The branches screen in the light theme: the Warnings tab on the left with critical and attention items, the MyGame repository row with branches by severity, uncommitted changes and stashes in the middle, and the selected master branch on the right with a table of tip, up and local counts per slot and the viewing repository buttons">
 </p>
+
+Each project shows its repository row, then branches by severity, then uncommitted changes, then stashes. When a branch with the same name is in several clones, the app judges them:
+
+| Verdict | Meaning |
+|---|---|
+| Same tip | every copy has the same tip |
+| Only needs a pull | every copy has an upstream of the same name, and none is ahead or has commits on no remote |
+| A copy is ahead | tips differ and a copy is ahead of its upstream |
+| Copies diverged | a copy has commits on no remote and the tips differ |
+| Cannot compare | a copy has no upstream or an upstream with another name |
+
+Filters: **Attention** (default, hides only the clean ones) · **Checked out** · **All**. `!N` on the tab is critical plus attention. Who has a branch checked out comes from the quick (basic) data; values such as commits on no remote come from the detailed (full) git data. The Branches screen needs core 0.7.0 or later; with an older core it shows only counts per repository.
+
+### Viewing repository
+
+Each clone has its own branches, so one Fork window cannot show them all. The **viewing repository** is a bare repository with one remote per slot, so every slot's branches can be seen in one repository.
+
+- The app never writes to slot repositories. The viewing repository is created and updated by the core's `branch-view` only when a person presses **Create…** or **Update**. The app first shows the plan (expected size and so on) and goes ahead only after you confirm.
+- The core only reads the slots. The viewing repository is **not a backup.**
+- Its location is a core setting; the app shows it read-only.
+
+### Settings
+
+<p align="center">
+  <img src="docs/assets/app-settings-light.png" width="800" alt="The settings popup in the light theme: categories General, Display, Open, Refresh, Alerts, Viewing repository, Core and About on the left; display language, close button, window always on top, start with Windows and start minimized on the right">
+</p>
+
+Dark theme: [Slots](docs/assets/app-slots-dark.png) · [Branches](docs/assets/app-branches-dark.png) · [Settings](docs/assets/app-settings-dark.png). Light theme slots: [Slots](docs/assets/app-slots-light.png).
+
+## Window behavior
+
+| Item | Behavior |
+|---|---|
+| First size | 1200x760. Position, size and maximized state are remembered |
+| Close (X) | Quits the app. Settings can change it to "Hide to tray" |
+| Tray | Left click shows or hides. Menu: show window, settings, quit. The tooltip shows the worst state (for example "editors 5/6 · stalled 1 · warnings 5") |
+| Minimized | Refreshing goes on while minimized. The taskbar icon carries a critical/attention overlay, and the taskbar flashes when a new critical state appears (stalled start, commit charge critical). Refreshing stops only when hidden to the tray |
+| Start with Windows | Off by default; only an installed copy can turn it on. Started by Windows, it starts minimized (a setting) |
+| Single instance | Running the installed app again brings the existing window to the front (not in development builds) |
+| Always on top | Off by default. The pin button in the title bar = the "Window always on top" setting |
+
+The theme follows the system; `Ctrl+Shift+D` or the settings fix light or dark. The UI text comes in Korean and English and follows the system language by default.
+
+**Animation:** theme changes, screen changes, list reordering and the details and banner appearing move once, briefly. Nothing repeats. With Windows "Animation effects" off (reduced motion), everything changes at once.
+
+## Shortcuts
+
+| Keys | Action |
+|---|---|
+| `Ctrl+1` / `Ctrl+2`, `Ctrl+Tab` | Slots / Branches screen, next screen |
+| `Ctrl+Shift+E` / `Ctrl+\` | Toggle the side panel / the details column |
+| `Ctrl+F`, `Esc` | Search the list; close search, menus and popups |
+| `↑ ↓ Home End`, `← →`, `Enter` | Move in the list, collapse or expand a group |
+| `Shift+F10` / Menu key | Context menu of the selected row |
+| `Ctrl+C` / `Ctrl+O` | Copy the path or branch name / open with the open program |
+| `Ctrl+Shift+C` | Copy cleanup request (the selected project) |
+| `F5` / `Shift+F5` | Refresh / refresh detailed git |
+| `Ctrl+,` / `Ctrl+Shift+D` | Settings / light or dark |
+
+Open in Unity has no shortcut: an editor started by mistake uses a lot of memory.
+
+## Context menus
+
+- Slot: **Open in Unity**, open with the open program (Fork by default), Explorer, copy path. Open in Unity calls `unity-slot open <slot> -NoWait`, so the core's checks apply as they are: already open, a batch run, a locked `Temp\UnityLockfile`, a Unity version that is not installed, and capacity warnings. The platform (`-BuildTarget`) is not passed. On an open slot it becomes **Show Unity window**. It is disabled for a closed slot leased by someone else, a slot whose folder is missing, and a slot in a batch run. It does not take a lease.
+- Branch: copy name, open a slot that has it checked out with the open program, Explorer, copy a cleanup request for this branch, copy the viewing ref name.
+- **Copy cleanup request** puts the items to look at (commits on no remote, branches without an upstream, stashes, editors open without a lease and so on) on the clipboard as a Markdown checklist. Paste it into an agent session; the agent asks what to do with each item and handles only what you approve.
 
 ## How it works
 
@@ -76,97 +135,102 @@ flowchart LR
     editors -- "processes · memory" --> core
     state -- "registry · leases · events" --> core
     core -- "JSON document<br/>every 30 s · 5 s while starting" --> widget
-    editors -. "process ids change (checked every 3 s)" .-> widget
-    state -. "files change (checked every 3 s)" .-> widget
+    editors -. "when a PID changes (checked every 3 s)" .-> widget
+    state -. "when a file changes (checked every 3 s)" .-> widget
 ```
 
-- **Full check.** Runs `unity-slot dashboard -Json -Git basic` in a hidden window (20-second limit, one at a time). Detailed git state such as commits on no remote (`-Git full`) comes every 5 minutes and when a card is opened for the first time.
-- **Quick check.** Every 3 seconds it looks only at the list of Unity.exe process ids (ToolHelp) and the size and time of the state-folder files. No process is started, so it takes a few ms. When something changes, a full check follows one second later.
-- **Hidden means paused.** Hidden to the tray, both stop; when shown again it checks once right away.
-- **No fetch.** `↓` is as of the last fetch, whose time is in the footer.
-
-Measured on Windows 10 with 4 editors and 8 slots:
-
-| Item | Value |
-|---|---|
-| Widget process tree (with WebView2) | 216 MB private |
-| Widget CPU | about 1% of one core |
-| One full check | basic about 1.7–2 s, full about 2.2–2.5 s |
-| Average CPU including checks | about 5% of one core |
+- **Full refresh:** runs `unity-slot dashboard -Json -Git basic` in a hidden window (one at a time). Detailed git (`-Git full`), such as commits on no remote, comes every 5 minutes, and when you enter the Branches screen and the last one is older than 60 seconds.
+- **Quick check:** every 3 seconds it looks only at the list of Unity.exe process IDs and the size and time of the files in the state folder. No process is started. On a change, a full refresh follows soon.
+- **No fetch.** `↓` is as of the last fetch, whose time is in the status bar.
 
 ## With unity-slot
 
+**Core needed: unity-slot 0.7.0 or later** (Branches screen and viewing repository). With 0.6.x the Slots screen still works.
+
 ```mermaid
 flowchart LR
-    agent["Coding agents"] -- "MCP tools" --> mcp["unity-slot MCP server"]
-    person["You"] -- "commands" --> cli["unity-slot.ps1"]
+    agent["Coding agent"] -- "MCP tools" --> mcp["unity-slot MCP server"]
+    person["Person"] -- "commands" --> cli["unity-slot.ps1"]
     mcp --> cli
-    cli -- "open · close" --> editor["Unity editors"]
+    cli -- "open · close" --> editor["Unity editor"]
     cli <--> state[("State folder")]
     cli -- "dashboard -Json" --> widget["Unity Slot Widget"]
-    widget -- "right-click → Open in Unity: open -NoWait" --> cli
-    person -. "glance" .-> widget
+    widget -- "Open in Unity: open -NoWait" --> cli
+    widget -- "only when a person presses: branch-view" --> cli
+    person -. "a glance" .-> widget
 ```
 
-The widget finds unity-slot in this order and uses the first hit:
+The app finds unity-slot in this order and uses the first it finds:
 
-1. "unity-slot.ps1 location" in Settings
-2. the `UNITY_SLOT_SCRIPT` environment variable
-3. `install.json` in the state folder (unity-slot records its location there on every run)
+1. "unity-slot.ps1 location" in the settings
+2. the environment variable `UNITY_SLOT_SCRIPT`
+3. `install.json` in the state folder, which unity-slot writes each time it runs
 4. `unity-slot.ps1` or `unity-slot.cmd` on `PATH`
 
-The state folder is `UNITY_SLOT_HOME`, or `%USERPROFILE%\.unity-slot`, the same rule unity-slot uses. When the document's schema major differs (`unity-slot.dashboard/2` and later), the widget only says that the versions do not match. This widget reads schema 1.
+The state folder is `UNITY_SLOT_HOME`, or `%USERPROFILE%\.unity-slot`. If the document's schema major number differs (`unity-slot.dashboard/2` and so on), the app only says the versions do not match. This app reads schema 1.
 
 ## Install
 
 ### Release
 
-Download `Unity-Slot-Widget_<version>_x64-setup.exe` from [Releases](https://github.com/cyKim0115/unity-slot-widget/releases) and run it. It installs for the current user only, without admin rights. Check the file against the SHA-256 published with it.
+Download `Unity-Slot-Widget_<version>_x64-setup.exe` from [Releases](https://github.com/cyKim0115/unity-slot-widget/releases) and run it. It installs for the current user only and needs no administrator rights. Check the file with the SHA-256 published next to it.
 
-> The installer is not code-signed, so on first run Windows SmartScreen may show "Windows protected your PC". Choose **More info → Run anyway**. If you would rather not, build from source.
+> The installer is not code-signed, so on first run Windows SmartScreen may show "Windows protected your PC". Choose **More info → Run anyway**. If you would rather not, build from source as below.
 
 ### From source
 
-You need Node.js 20 or later, Rust stable, the Visual Studio C++ Build Tools and the WebView2 runtime.
+You need Node.js 20 or later, Rust stable, Visual Studio C++ Build Tools and the WebView2 runtime.
 
 ```powershell
 git clone https://github.com/cyKim0115/unity-slot-widget
 cd unity-slot-widget
 npm install
 npm run tauri dev          # development run
+npm test                   # unit tests (vitest)
 ```
 
-`start.bat` builds a release exe, installs it to `%LOCALAPPDATA%\UnitySlotWidget` and starts it. Later runs rebuild only when the source changed. Run it from Explorer or your own terminal. An agent shell that runs inside an app container may virtualize AppData writes and install it somewhere else.
+`start.bat` (or `시작.bat`) builds the release exe, installs it to `%LOCALAPPDATA%\UnitySlotWidget` and runs it. Run again, it rebuilds only when the source changed. Run it from Explorer or a terminal you opened yourself: from an agent shell inside an app container, AppData writes are virtualized and it may install somewhere else.
 
-The installer comes from `scripts\build-release.ps1`. It strips the user folder from the source paths Rust puts into the binary, stops if any is left, and writes `SHA256SUMS.txt`.
+`scripts\build-release.ps1` makes the installer. It strips user folders from the source paths Rust puts in the executable and stops if any remain. At the end it writes `SHA256SUMS.txt`.
 
-To see the screens without Tauri, run `npm run dev` and open `http://localhost:1431/?sample=dashboard&lang=en` in a browser. The samples are in `samples/`; there is also `sample=states`.
+To see the screens without Tauri, run `npm run dev` and open `http://localhost:1431/?sample=dashboard&lang=en` in a browser. Samples are in `samples/` (`sample=states`, `sample=old-core`); it also takes `theme=light|dark`, `view=slots|branches`, `nav=projects|warnings|log` and `frame=1200x760`.
 
-## Settings
+## Settings items
 
-Open them from the tray icon or the widget's right-click menu. They are saved to `<state folder>\widget.json`. That is the unity-slot state folder, not AppData, so people and agents see the same file. Only the window position is stored separately.
+The gear in the title bar, the tray menu or `Ctrl+,`. A change applies at once and is saved to `<state folder>\widget.json`. People and agents share that file, so only the changed keys are merged in. Each item has a reset button, and there is "Reset all". Screen state (side panel tab, column widths, screen tab, filters, selection) is kept by the app separately.
 
-| Setting | Default | Meaning |
+| Category | Item | Default |
 |---|---|---|
-| Language | System language | Korean or English |
-| Always on top | On | Above other windows |
-| Program for right-click → Open | **Fork** | Command Prompt, Git Bash, Cursor, VS Code, File Explorer |
-| Start with Windows | **Off** | Only in the installed app |
-| Full check interval / while starting | 30 s / 5 s | |
-| Detailed git check interval | 5 min | |
-| Quick check interval | 3 s | |
-| System commit warning / critical | 85% / 90% | |
-| Memory warning for one slot | 10 GB | |
-| Commits on no remote warning / critical | 3 / 14 days | |
-| unity-slot.ps1 location | empty | Empty means the order above |
+| General | Display language | system language |
+| | Close (X) button | quit the app (or hide to tray) |
+| | Window always on top | off |
+| | Start with Windows | off (installed copy only) |
+| | Start minimized when started with Windows | on |
+| Display | Theme | system (light, dark) |
+| | Theme transition | 250 ms (0 to 1000) |
+| Open | Open program | **Fork** (Command Prompt, Git Bash, Cursor, VS Code, Explorer) |
+| Refresh | Normal / while starting | 30 s / 5 s |
+| | Detailed git | 5 min |
+| | Quick change check | 3 s |
+| Alerts | System commit attention / critical | 85% / 90% |
+| | Memory per slot attention | 10 GB |
+| | Commits on no remote attention / critical | 3 days / 14 days |
+| | Flash the taskbar on a new critical state | on |
+| Viewing repository | Open in Fork after an update | on |
+| Core | unity-slot.ps1 location | empty (found in the order above) |
+| | Sample data file | empty (development) |
+| About | App and core versions, settings file location, license | |
+
+There are no background blur or transparent window settings (removed in 0.2.0). `glass` and `glassBlur` in an old `widget.json` are ignored and dropped on the next save. The old `alwaysOnTop` is not read; its value is kept.
 
 ## What it does not do
 
-- Close or lease slots, end processes, or write to git (including fetch, pull and push). It never starts Unity.exe itself either; unity-slot's `open` does that for Open in Unity.
-- Talk to the network or open a local port. The page and Rust talk over Tauri IPC only.
-- Show command lines. unity-slot's dashboard output has none (Hub tokens and the like).
-- Start automatically by default
+- It never writes to slot repositories (no fetch, pull, push or checkout). The viewing repository is created and updated by the core's `branch-view` only when a person presses the button. The viewing repository is not a backup.
+- Close or lease slots, or end processes. It never starts Unity.exe itself; Open in Unity is done by unity-slot `open`.
+- Network traffic or a local port. The UI and Rust talk only over Tauri IPC.
+- Show command lines. unity-slot's dashboard output has none (Hub tokens and so on).
+- Start with Windows by default.
 
-## License
+## Sources and license
 
-[MIT](LICENSE). See [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) for icons and libraries.
+[MIT](LICENSE). The window frame (title bar, side panel, column resizing, menus, dialogs, banner, status bar, themes, settings popup, shortcuts) was taken from [Frond](https://github.com/cyKim0115/Frond/) (commit `99d89bc`), an MIT app by the same author, and changed. Per-file sources are in [src/shell/SOURCES.md](src/shell/SOURCES.md). For icons and libraries see [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
