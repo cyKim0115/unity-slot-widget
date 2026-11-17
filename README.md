@@ -79,7 +79,7 @@
 ### 설정
 
 <p align="center">
-  <img src="docs/assets/app-settings-light.png" width="800" alt="라이트 테마의 설정 팝업: 왼쪽에 일반·화면·열기·조회·알림 기준·보기용 저장소·코어·정보 분류, 오른쪽에 화면 언어, 닫기(X) 단추, 창 항상 위, Windows 시작 시 실행, 자동 시작이면 최소화로 항목">
+  <img src="docs/assets/app-settings-light.png" width="800" alt="라이트 테마의 설정 창: 왼쪽에 일반·화면·열기·조회·알림 기준·보기용 저장소·코어·정보 분류, 오른쪽에 화면 언어, 닫기(X) 단추, 창 항상 위, Windows 시작 시 실행, 자동 시작이면 최소화로 항목">
 </p>
 
 다크 테마 그림: [슬롯](docs/assets/app-slots-dark.png) · [브랜치](docs/assets/app-branches-dark.png) · [설정](docs/assets/app-settings-dark.png). 라이트 테마 슬롯 화면: [슬롯](docs/assets/app-slots-light.png).
@@ -106,7 +106,7 @@
 |---|---|
 | `Ctrl+1` / `Ctrl+2`, `Ctrl+Tab` | 슬롯 / 브랜치 화면, 다음 화면 |
 | `Ctrl+Shift+E` / `Ctrl+\` | 탐색 영역 / 본문 열 접기·펴기 |
-| `Ctrl+F`, `Esc` | 목록 찾기, 찾기·메뉴·팝업 닫기 |
+| `Ctrl+F`, `Esc` | 목록 찾기, 찾기·메뉴·대화상자 닫기 |
 | `↑ ↓ Home End`, `← →`, `Enter` | 목록에서 고르기, 그룹 접기·펴기 |
 | `Shift+F10` / 메뉴 키 | 고른 줄의 우클릭 메뉴 |
 | `Ctrl+C` / `Ctrl+O` | 경로·브랜치 이름 복사 / 열 프로그램으로 열기 |
@@ -233,4 +233,4 @@ Tauri 없이 화면만 보려면 `npm run dev`를 실행한 뒤 브라우저에�
 
 ## 출처와 라이선스
 
-[MIT](LICENSE). 창 틀(제목 표시줄, 탐색 영역, 열 크기 조절, 메뉴, 대화상자, 배너, 상태바, 테마, 설정 팝업, 단축키)은 같은 저작자의 MIT 앱 [Frond](https://github.com/cyKim0115/Frond/)(커밋 `99d89bc`)에서 가져와 고쳤습니다. 파일별 출처는 [src/shell/SOURCES.md](src/shell/SOURCES.md)에 있습니다. 아이콘·라이브러리는 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)를 보세요.
+[MIT](LICENSE). 창 틀(제목 표시줄, 탐색 영역, 열 크기 조절, 메뉴, 대화상자, 배너, 상태바, 테마, 설정 창, 단축키)은 같은 저작자의 MIT 앱 [Frond](https://github.com/cyKim0115/Frond/)(커밋 `99d89bc`)에서 가져와 고쳤습니다. 파일별 출처는 [src/shell/SOURCES.md](src/shell/SOURCES.md)에 있습니다. 아이콘·라이브러리는 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)를 보세요.
