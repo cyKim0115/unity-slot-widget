@@ -309,6 +309,10 @@
   border: 1px solid transparent;
   cursor: pointer;
 }
+/* The glow overlay (motion, end of file) is placed over the row */
+.slot {
+  position: relative;
+}
 .slot:hover,
 .extra-row:hover {
   background: var(--hover);
@@ -891,5 +895,63 @@
   #list-inner {
     padding-left: 8px;
     padding-right: 8px;
+  }
+}
+
+/*
+ * ---- motion (src/motion.ts) ----
+ * Each animation plays once. A row whose editor just opened (or just became ready) glows once
+ * through an overlay, so the selected row's accent bar and the tints stay as they are.
+ */
+.slot.glow-open::after,
+.slot.glow-ready::after {
+  content: "";
+  position: absolute;
+  inset: -1px;
+  border-radius: inherit;
+  pointer-events: none;
+  animation: slot-glow 900ms ease-out 1 both;
+}
+.slot.glow-open::after {
+  --glow: var(--accent);
+}
+.slot.glow-ready::after {
+  --glow: var(--ok);
+}
+@keyframes slot-glow {
+  from {
+    background: color-mix(in srgb, var(--glow) 22%, transparent);
+    box-shadow: 0 0 0 1px color-mix(in srgb, var(--glow) 60%, transparent);
+  }
+  to {
+    background: transparent;
+    box-shadow: 0 0 0 1px transparent;
+  }
+}
+/* The banner and the warnings badge come in once when they appear (display none -> shown) */
+#banner:not([hidden]) {
+  animation: banner-in 180ms ease-out 1;
+}
+@keyframes banner-in {
+  from {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+}
+.nav-badge:not([hidden]) {
+  animation: badge-pop 220ms cubic-bezier(0.3, 1.6, 0.5, 1) 1;
+}
+@keyframes badge-pop {
+  from {
+    transform: scale(0.4);
+    opacity: 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .slot.glow-open::after,
+  .slot.glow-ready::after,
+  #banner:not([hidden]),
+  .nav-badge:not([hidden]) {
+    animation: none;
   }
 }

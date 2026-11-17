@@ -42,6 +42,7 @@
 import { call, inTauri, isWindowVisible, on } from "./backend";
 import { applyDomTexts, currentLang, formatClock, formatDuration, formatSize, formatWhen, resolveLang, setLang, t } from "./i18n";
 import { glance, newRisks } from "./glance";
+import { fadeIn, playList, snapshotList } from "./motion";
 import {
   cleanupRequest,
   detachedName,
@@ -208,6 +209,9 @@ let findText = "";
 let sheetOpen = false;
 /** Scroll the selected row into view after the next list paint (the restored one, the first time). */
 let revealSelection = true;
+/** The screen the list drew last and what the details column showed last (motion.ts). */
+let lastScreen: View | null = null;
+let lastBodyKey: string | null = null;
 /** What the list shows now: its item keys are the keyboard order. */
 let listView: SlotListView | null = null;
 
@@ -523,7 +527,16 @@ function markSelection(inner: HTMLElement, list: HTMLElement, key: string | null
   revealSelection = false;
 }
 
+/** Draws the list; items that moved slide to their new place, another screen fades in (motion.ts). */
 function paintList() {
+  const inner = $("list-inner");
+  const before = lastScreen ? snapshotList(inner, lastScreen) : null;
+  drawList();
+  playList(inner, before, view);
+  lastScreen = view;
+}
+
+function drawList() {
   const inner = $("list-inner");
   const list = $("list");
   list.removeAttribute("aria-activedescendant");
@@ -685,6 +698,10 @@ function renderBody() {
   $("body-title").innerHTML = nameHtml(title, "title-name");
   $("sheet-title").innerHTML = nameHtml(title, "title-name");
   $("body-content").innerHTML = bodyContent();
+  // Another item: the details fade in (a refresh of the same item does not)
+  const bodyKey = `${view}|${doc ? (view === "branches" ? branchSelected : selected) : ""}`;
+  if (bodyKey !== lastBodyKey) fadeIn($("body-content"));
+  lastBodyKey = bodyKey;
 }
 
 function renderPanels() {
