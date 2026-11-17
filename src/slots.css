@@ -499,7 +499,8 @@
 .part:has(.lease) {
   flex-shrink: 3;
 }
-.part:not(:has(.branch)):not(:has(.lease)) {
+/* :where keeps this default as weak as .part, so later named parts (.co-list, .when in branches.css) still set their own shrink */
+.part:where(:not(:has(.branch)):not(:has(.lease))) {
   flex-shrink: 0;
 }
 .branch {
