@@ -221,7 +221,7 @@ The gear in the title bar, the tray menu or `Ctrl+,`. A change applies at once a
 | | Sample data file | empty (development) |
 | About | App and core versions, settings file location, license | |
 
-There are no background blur or transparent window settings (removed in 0.2.0). `glass` and `glassBlur` in an old `widget.json` are ignored and dropped on the next save. The old `alwaysOnTop` is not read; its value is kept.
+There are no background blur or transparent window settings (removed in 0.2.0). `glass`, `glassBlur` and `alwaysOnTop` in an old `widget.json` are not read, and saving does not remove them either.
 
 ## What it does not do
 
