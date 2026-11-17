@@ -120,6 +120,7 @@ import {
   type ItemRef,
   type SlotFilter,
   type SlotListView,
+  type StaleLeaseButton,
   type UnityButton,
 } from "./screens/slots";
 import { relabelBanner, setBannerFocusHome, showBanner, type BannerState } from "./shell/banner";
@@ -152,6 +153,7 @@ import type {
   GitState,
   OpenResult,
   OpenTarget,
+  ReleaseResult,
   RepoGit,
   Slot,
   WidgetSettings,
@@ -669,7 +671,7 @@ function bodyContent(): string {
   switch (ref?.kind) {
     case "slot": {
       const slot = findSlot(ref.name);
-      if (slot) return slotBody(slot, ctx, unityButton(slot), settings.openTarget);
+      if (slot) return slotBody(slot, ctx, unityButton(slot), settings.openTarget, staleLease(slot));
       break;
     }
     case "group": {
@@ -1273,6 +1275,78 @@ async function unitySlot(slot: Slot) {
   void refresh(false);
 }
 
+// ---------------------------------------------------------------- stale lease (core `release -Stale`)
+
+/** The slot whose stale lease is being released (one at a time, like core.rs RELEASING). */
+let releasing: string | null = null;
+
+/**
+ * The release item of a slot: null when its lease is not stale (the core's `lease.stale`; older cores
+ * have none, so no item), else off with a reason, or on.
+ */
+function staleLease(slot: Slot): StaleLeaseButton | null {
+  if (slot.lease?.stale !== true) return null;
+  if (lastResult?.source === "sample") return { off: t("unity.offSample") };
+  if (releasing) return { off: t("lease.releasing") };
+  return { off: null };
+}
+
+function leaseError(code: string): string {
+  const [kind, ...rest] = code.split(":");
+  switch (kind) {
+    case "busy":
+      return t("lease.releasing");
+    case "core-not-found":
+      return t("error.core-not-found");
+    case "sample":
+      return t("unity.offSample");
+    case "timeout":
+      return t("toast.unityTimeout");
+    case "refused":
+      return t("lease.refused", { reason: rest.join(":") });
+    case "changed":
+      return t("lease.changed");
+    case "exit":
+      return t("lease.failed", { text: rest.slice(1).join(":") || code });
+    default:
+      return t("lease.failed", { text: rest.join(":") || code });
+  }
+}
+
+/** Asks, then runs `unity-slot release <slot> -Stale`: the core checks again and never touches an editor. */
+async function releaseStale(slot: Slot) {
+  const action = staleLease(slot);
+  const lease = slot.lease;
+  if (!action || !lease) return;
+  if (action.off) {
+    flashStatus(action.off, 4000);
+    return;
+  }
+  const why = lease.expired
+    ? t("lease.whyExpired", { time: formatWhen(lease.expiresAt, now()) })
+    : t("lease.whyClientGone", { name: lease.client?.name ?? "?", pid: lease.client?.pid ?? "?" });
+  const ok = await showDialog({
+    title: t("lease.releaseTitle", { slot: slot.name }),
+    message: t("lease.releaseMessage", { owner: lease.owner, why }),
+    detail: `unity-slot release ${slot.name} -Stale`,
+    confirmLabel: t("lease.releaseConfirm"),
+    cancelLabel: t("dialog.cancel"),
+  });
+  if (!ok) return;
+  releasing = slot.name;
+  render();
+  flashStatus(t("lease.releasing"), 30_000);
+  try {
+    const r = await call<ReleaseResult>("release_stale_lease", { slot: slot.name });
+    flashStatus(t(r.outcome === "not-leased" ? "lease.notLeased" : "lease.released", { slot: slot.name }), 4000);
+  } catch (e) {
+    flashStatus(leaseError(String(e)), 6000);
+  } finally {
+    releasing = null;
+  }
+  void refresh(false);
+}
+
 async function openSlot(slot: Slot, target: OpenTarget) {
   try {
     await call("open_with", { path: slot.path, target });
@@ -1567,9 +1641,19 @@ function slotMenu(slot: Slot): MenuEntry[] {
       disabled: unity.kind === "off",
       action: () => void unitySlot(slot),
     },
+  ];
+  const stale = staleLease(slot);
+  if (stale) {
+    entries.push({
+      label: stale.off ? t("menu.releaseStaleOff", { reason: stale.off }) : t("menu.releaseStale"),
+      disabled: stale.off !== null,
+      action: () => void releaseStale(slot),
+    });
+  }
+  entries.push(
     "separator",
     { label: t("menu.open", { app: t(`open.${target}`) }), shortcut: "Ctrl+O", action: () => void openSlot(slot, target) },
-  ];
+  );
   // Open already is Explorer: one item is enough
   if (target !== "explorer") entries.push({ label: t("menu.openExplorer"), action: () => void openSlot(slot, "explorer") });
   entries.push(
@@ -1748,6 +1832,9 @@ function onActionClick(e: MouseEvent): boolean {
       break;
     case "unity":
       if (slot) void unitySlot(slot);
+      break;
+    case "release-stale":
+      if (slot) void releaseStale(slot);
       break;
     case "open":
       if (slot) void openSlot(slot, settings.openTarget);

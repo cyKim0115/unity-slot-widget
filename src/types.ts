@@ -39,6 +39,11 @@ export interface Lease {
   host?: string | null;
   /** The MCP client process that took the lease (core 0.5.5+); null for CLI and older leases. */
   client?: { name?: string | null; pid?: number | null; startedAt?: string | null; alive?: boolean | null } | null;
+  /**
+   * What `release <slot> -Stale` drops: no editor or batchmode run, and expired or its client gone.
+   * The core decides; missing on older cores (then the widget offers no release).
+   */
+  stale?: boolean;
 }
 
 /** Commits on no remote: how many and the oldest one's time. */
@@ -300,6 +305,11 @@ export interface OpenResult {
   pid?: number | null;
   /** `warn capacity: ...` lines from the core; it warns and opens anyway. */
   warnings?: string[] | null;
+}
+
+/** `release_stale_lease`: what `unity-slot release <slot> -Stale` did. */
+export interface ReleaseResult {
+  outcome: "released" | "not-leased" | string;
 }
 
 /** Programs a slot folder can be opened with (right-click > Open). The first is the default. */

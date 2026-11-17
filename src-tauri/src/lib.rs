@@ -119,6 +119,19 @@ async fn branch_view(app: tauri::AppHandle, project: String, apply: bool) -> Res
     .map_err(|e| e.to_string())?
 }
 
+/// A slot card's right-click > Release stale lease: `unity-slot release <slot> -Stale` through the
+/// core, after the person confirmed. Nothing while sample data is shown.
+#[tauri::command]
+async fn release_stale_lease(slot: String) -> Result<core::ReleaseResult, String> {
+    let s = settings::load();
+    if settings::sample_source(&s).is_some() {
+        return Err("sample".into());
+    }
+    tauri::async_runtime::spawn_blocking(move || core::release_stale(&s.unity_slot_script, &slot))
+        .await
+        .map_err(|e| e.to_string())?
+}
+
 /// A slot card's right-click > Show Unity window, for an editor that is already open.
 #[tauri::command]
 fn focus_editor(pid: u32) -> Result<(), String> {
@@ -190,6 +203,7 @@ pub fn run() {
             open_with,
             open_in_unity,
             branch_view,
+            release_stale_lease,
             focus_editor,
             set_tray_labels,
             set_glance,

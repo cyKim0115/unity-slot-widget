@@ -187,7 +187,7 @@
       "memo": "Codex work clone",
       "exists": true,
       "editor": { "state": "closed" },
-      "lease": null,
+      "lease": { "owner": "codex:5e2a9c11", "need": "codex", "acquiredAt": "2026-11-06T09:00:00+09:00", "expiresAt": "2026-11-06T17:00:00+09:00", "expired": true, "openedByAcquire": true, "host": "DEV-PC", "client": { "name": "codex.exe", "pid": 18220, "startedAt": "2026-11-06T08:58:12+09:00", "alive": false }, "stale": true },
       "git": {
         "level": "full",
         "branch": "feature/skin-paint-fx",
@@ -210,7 +210,7 @@
       },
       "lastOpenedAt": "2026-11-06T15:02:00+09:00",
       "lastClosedAt": "2026-11-06T17:40:00+09:00",
-      "flags": []
+      "flags": ["lease-client-gone"]
     },
     {
       "name": "MyGame-release",

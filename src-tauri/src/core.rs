@@ -1,7 +1,8 @@
 //! Runs `unity-slot dashboard -Json` and hands the document to the page as it is, runs
 //! `unity-slot open <slot> -NoWait` for a slot card's right-click > Open in Unity, and runs
 //! `unity-slot branch-view -Project <p> -Json [-Apply]` when a person asks for the view repository
-//! (core 0.7.0: a bare repository whose remotes are the slots; the core only reads the slots).
+//! (core 0.7.0: a bare repository whose remotes are the slots; the core only reads the slots), and
+//! runs `unity-slot release <slot> -Stale` for a slot card's right-click > Release stale lease.
 //!
 //! The widget never decides anything about slots: the core owns the rules and the schema
 //! (`unity-slot.dashboard/1`). This file only finds the core, runs it in a hidden window with a
@@ -381,6 +382,110 @@ fn branch_view_outcome(code: i32, stdout: &str, stderr: &str) -> Result<BranchVi
     Err(format!("exit:{code}:{}", short(&message)))
 }
 
+/// `release -Stale` only edits a lease file; it never waits for an editor.
+const RELEASE_TIMEOUT: Duration = Duration::from_secs(30);
+
+/// One stale release at a time, held until the core's process ends (like OPENING).
+static RELEASING: AtomicBool = AtomicBool::new(false);
+
+#[derive(Debug, PartialEq, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ReleaseResult {
+    /// `released`, or `not-leased` (someone released it before the press).
+    pub outcome: String,
+}
+
+/// `unity-slot release <slot> -Stale`, run because a person pressed a button. The core decides again
+/// at run time that the lease is stale (slot closed; lease expired or its client process gone) and
+/// never touches an editor, so a lease that became current or an editor opened since the last
+/// refresh is left alone.
+/// Errors: `bad-slot`, `busy`, `core-not-found`, `spawn:<text>`, `timeout` (left running, not
+/// killed), `refused:<reason>` (not stale), `changed` (taken over or renewed a moment ago),
+/// `exit:<code>:<text>` (for example an older core without `-Stale`).
+pub fn release_stale(setting_script: &str, slot: &str) -> Result<ReleaseResult, String> {
+    let slot = slot.trim();
+    // One slot name, and never something PowerShell would read as a parameter or a list
+    if slot.is_empty() || slot.starts_with('-') || slot.contains(',') || slot.chars().any(char::is_control) {
+        return Err("bad-slot".into());
+    }
+    let location = paths::locate_core(setting_script);
+    let script = location.script.ok_or_else(|| "core-not-found".to_string())?;
+    if RELEASING.swap(true, Ordering::AcqRel) {
+        return Err("busy".into());
+    }
+    let CoreRun { mut child, out_reader, err_reader } = match start_core(&script, &["release", slot, "-Stale"], true) {
+        Ok(run) => run,
+        Err(e) => {
+            RELEASING.store(false, Ordering::Release);
+            return Err(e);
+        }
+    };
+    let deadline = Instant::now() + RELEASE_TIMEOUT;
+    let status = loop {
+        match child.try_wait() {
+            Ok(Some(status)) => break status,
+            Ok(None) if Instant::now() >= deadline => {
+                std::thread::spawn(move || {
+                    let _ = child.wait();
+                    let _ = out_reader.join();
+                    let _ = err_reader.join();
+                    RELEASING.store(false, Ordering::Release);
+                });
+                return Err("timeout".into());
+            }
+            Ok(None) => std::thread::sleep(Duration::from_millis(50)),
+            Err(e) => {
+                std::thread::spawn(move || {
+                    let _ = child.wait();
+                    let _ = out_reader.join();
+                    let _ = err_reader.join();
+                    RELEASING.store(false, Ordering::Release);
+                });
+                return Err(format!("spawn:{e}"));
+            }
+        }
+    };
+    let out = out_reader.join().unwrap_or_default();
+    let err = err_reader.join().unwrap_or_default();
+    RELEASING.store(false, Ordering::Release);
+    release_outcome(status.code().unwrap_or(-1), &String::from_utf8_lossy(&out), &String::from_utf8_lossy(&err))
+}
+
+/// The core's `[release] ...` lines: `RELEASED <slot>`, `NOT LEASED`, `REFUSED: not a stale lease:
+/// <reason>. Nothing was changed.`, `lease   <slot>: changed a moment ago ...`, `ERROR: ...`.
+fn release_outcome(code: i32, stdout: &str, stderr: &str) -> Result<ReleaseResult, String> {
+    let lines: Vec<&str> = stdout
+        .trim_start_matches('\u{feff}')
+        .lines()
+        .map(str::trim)
+        .map(|l| l.strip_prefix("[release]").map(str::trim_start).unwrap_or(l))
+        .filter(|l| !l.is_empty())
+        .collect();
+    let find = |prefix: &str| lines.iter().find(|l| l.starts_with(prefix)).copied();
+    if code == 0 {
+        if find("RELEASED ").is_some() {
+            return Ok(ReleaseResult { outcome: "released".into() });
+        }
+        if find("NOT LEASED").is_some() {
+            return Ok(ReleaseResult { outcome: "not-leased".into() });
+        }
+    }
+    if let Some(l) = find("REFUSED: not a stale lease:") {
+        let reason = l["REFUSED: not a stale lease:".len()..].trim();
+        let reason = reason.strip_suffix("Nothing was changed.").unwrap_or(reason).trim().trim_end_matches('.');
+        return Err(format!("refused:{}", short(reason)));
+    }
+    if lines.iter().any(|l| l.contains("changed a moment ago")) {
+        return Err("changed".into());
+    }
+    let text = find("ERROR:")
+        .map(|l| l["ERROR:".len()..].trim().to_string())
+        .or_else(|| stderr.lines().map(str::trim).find(|l| !l.is_empty()).map(str::to_string))
+        .or_else(|| lines.last().map(|l| l.to_string()))
+        .unwrap_or_default();
+    Err(format!("exit:{code}:{}", short(&text)))
+}
+
 fn pid_after(line: &str, prefix: &str) -> Option<u32> {
     line.strip_prefix(prefix)?.split(|c: char| !c.is_ascii_digit()).next()?.parse().ok()
 }
@@ -454,6 +559,30 @@ mod tests {
         assert_eq!(branch_view_outcome(1, "", err), Err("exit:1:[branch-view] ERROR no registered slot matches -Project x".to_string()));
         assert_eq!(branch_view_outcome(1, "", "ERROR: boom\n"), Err("exit:1:boom".to_string()));
         assert!(branch_view_outcome(0, r#"{"schema":"unity-slot.dashboard/1"}"#, "").unwrap_err().starts_with("parse:schema"));
+    }
+
+    #[test]
+    fn release_stale_outcomes() {
+        let ok = concat!(
+            "[release] slot    MyGame-2: closed; lease claude:1234abcd until 11-17 01:13 EXPIRED (expired)\r\n",
+            "[release] RELEASED MyGame-2\r\n",
+        );
+        assert_eq!(release_outcome(0, ok, ""), Ok(ReleaseResult { outcome: "released".into() }));
+        let none = "[release] slot    MyGame-2: closed; lease -\n[release] NOT LEASED: nothing to release.\n";
+        assert_eq!(release_outcome(0, none, ""), Ok(ReleaseResult { outcome: "not-leased".into() }));
+        let open = "[release] slot    MyGame-2: open pid 9; lease a until 11-17 01:13 EXPIRED\n[release] REFUSED: not a stale lease: the editor is open (pid 9). Nothing was changed.\n";
+        assert_eq!(release_outcome(4, open, ""), Err("refused:the editor is open (pid 9)".to_string()));
+        let changed = "[release] lease   MyGame-2: changed a moment ago (taken over, renewed or released); left as it is\n";
+        assert_eq!(release_outcome(4, changed, ""), Err("changed".to_string()));
+        // An older core: -Stale is an unknown parameter, so PowerShell fails before the command runs
+        assert!(release_outcome(1, "", "A parameter cannot be found that matches parameter name 'Stale'.\n").unwrap_err().starts_with("exit:1:A parameter"));
+    }
+
+    #[test]
+    fn release_stale_refuses_odd_slots_before_running_anything() {
+        for bad in ["", "  ", "-Stale", "a,b", "a\nb"] {
+            assert_eq!(release_stale("", bad), Err("bad-slot".to_string()), "{bad:?}");
+        }
     }
 
     #[test]

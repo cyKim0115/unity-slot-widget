@@ -17,7 +17,7 @@ A desktop app for [unity-slot](https://github.com/cyKim0115/unity-slot). For eac
   <img src="docs/assets/app-slots-dark.png" width="800" alt="The slot screen in the dark theme: the side panel on the left with open counts and a summary for the MyGame and Popup projects, the slot list by project in the middle, the details of the selected MyGame-1 on the right (path, Unity, memory, lease, git), and the status bar at the bottom">
 </p>
 
-The app never closes or leases a slot. The only thing that starts an editor is **Open in Unity**, and it only calls unity-slot `open -NoWait`, so the core decides the checks before opening and how the editor is started. Every judgment comes from `unity-slot dashboard -Json`; the app draws that document. The screenshots use the [sample data](samples/) (Korean UI).
+The app never closes or leases a slot. The only lease it releases is a stale one (the editor is closed, and the lease ran out or the program that took it has exited), when a person confirms and presses the button; that calls the core's `release <slot> -Stale`. The only thing that starts an editor is **Open in Unity**, and it only calls unity-slot `open -NoWait`, so the core decides the checks before opening and how the editor is started. Every judgment comes from `unity-slot dashboard -Json`; the app draws that document. The screenshots use the [sample data](samples/) (Korean UI).
 
 ## Layout
 
@@ -119,6 +119,7 @@ Open in Unity has no shortcut: an editor started by mistake uses a lot of memory
 ## Context menus
 
 - Slot: **Open in Unity**, open with the open program (Fork by default), Explorer, copy path. Open in Unity calls `unity-slot open <slot> -NoWait`, so the core's checks apply as they are: already open, a batch run, a locked `Temp\UnityLockfile`, a Unity version that is not installed, and capacity warnings. The platform (`-BuildTarget`) is not passed. On an open slot it becomes **Show Unity window**. It is disabled for a closed slot leased by someone else, a slot whose folder is missing, and a slot in a batch run. It does not take a lease.
+- Slot: **Release stale lease** shows only on a slot the core's dashboard marks `lease.stale` (no editor or batch run, and the lease ran out or the agent program that took it has exited). The confirmation shows the command it runs (`unity-slot release <slot> -Stale`); the core checks the state again and removes only the lease file. If an editor opened or the lease was renewed meanwhile, the core refuses and changes nothing. It never touches an editor and never releases a lease in use (for that, the CLI `release <slot> -AnyOwner`).
 - Branch: copy name, open a slot that has it checked out with the open program, Explorer, copy a cleanup request for this branch, copy the viewing ref name.
 - **Copy cleanup request** puts the items to look at (commits on no remote, branches without an upstream, stashes, editors open without a lease and so on) on the clipboard as a Markdown checklist. Paste it into an agent session; the agent asks what to do with each item and handles only what you approve.
 
@@ -156,7 +157,7 @@ flowchart LR
     cli <--> state[("State folder")]
     cli -- "dashboard -Json" --> widget["Unity Slot Widget"]
     widget -- "Open in Unity: open -NoWait" --> cli
-    widget -- "only when a person presses: branch-view" --> cli
+    widget -- "only when a person presses: branch-view, release -Stale" --> cli
     person -. "a glance" .-> widget
 ```
 
@@ -226,7 +227,7 @@ There are no background blur or transparent window settings (removed in 0.2.0). 
 ## What it does not do
 
 - It never writes to slot repositories (no fetch, pull, push or checkout). The viewing repository is created and updated by the core's `branch-view` only when a person presses the button. The viewing repository is not a backup.
-- Close or lease slots, or end processes. It never starts Unity.exe itself; Open in Unity is done by unity-slot `open`.
+- Close or lease slots, release a lease in use, or end processes. It never starts Unity.exe itself; Open in Unity is done by unity-slot `open`.
 - Network traffic or a local port. The UI and Rust talk only over Tauri IPC.
 - Show command lines. unity-slot's dashboard output has none (Hub tokens and so on).
 - Start with Windows by default.

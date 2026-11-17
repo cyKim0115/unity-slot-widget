@@ -113,6 +113,11 @@ async function preview(cmd: string, args?: Record<string, unknown>): Promise<unk
       return { version: "0.0.0-preview", settingsFile: "(preview)\\widget.json", slotHome: "(preview)", dev: true };
     case "open_in_unity":
       return { outcome: "started", pid: null, warnings: [] };
+    case "release_stale_lease":
+      // Like the Rust side: nothing for sample data, except the ?core=1 stand-in
+      if (!query.has("core")) throw "sample";
+      await sleep(400);
+      return { outcome: "released" };
     case "is_autostart_enabled":
       return false;
     default:

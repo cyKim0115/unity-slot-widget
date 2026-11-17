@@ -255,6 +255,9 @@ export function slotListHtml(view: SlotListView, ctx: RowContext): string {
 
 export type UnityButton = { kind: "open" } | { kind: "focus" } | { kind: "off"; reason: string };
 
+/** Release stale lease (core `release -Stale`): off with a reason, or on (`off: null`). */
+export type StaleLeaseButton = { off: string | null };
+
 function actButton(act: string, label: string, opts: { disabled?: boolean; data?: Record<string, string | number>; title?: string } = {}): string {
   const data = Object.entries(opts.data ?? {})
     .map(([k, v]) => ` data-${k}="${esc(v)}"`)
@@ -265,7 +268,7 @@ function actButton(act: string, label: string, opts: { disabled?: boolean; data?
 }
 
 /** A slot: state line, the action buttons, then the details rows. */
-export function slotBody(slot: Slot, ctx: RowContext, unity: UnityButton, openTarget: string): string {
+export function slotBody(slot: Slot, ctx: RowContext, unity: UnityButton, openTarget: string, stale: StaleLeaseButton | null = null): string {
   const state = slot.editor?.state ?? "closed";
   const startedStates = ["ready", "unknown", "starting", "stalled"];
   const head: string[] = [
@@ -283,6 +286,7 @@ export function slotBody(slot: Slot, ctx: RowContext, unity: UnityButton, openTa
     unity.kind === "open" ? t("menu.openUnity") : unity.kind === "focus" ? t("menu.focusUnity") : t("menu.openUnityOff", { reason: unity.reason });
   const buttons = [
     actButton("unity", unityLabel, { disabled: unity.kind === "off" }),
+    stale ? actButton("release-stale", t("menu.releaseStale"), { disabled: stale.off !== null, title: stale.off ?? `unity-slot release ${slot.name} -Stale` }) : "",
     actButton("open", t("menu.open", { app: t(`open.${openTarget}`) })),
     openTarget === "explorer" ? "" : actButton("explorer", t("menu.openExplorer")),
     actButton("log", t("btn.log")),

@@ -17,7 +17,7 @@
   <img src="docs/assets/app-slots-dark.png" width="800" alt="다크 테마의 슬롯 화면: 왼쪽 탐색 영역에 MyGame·Popup 프로젝트의 열림 수와 요약, 가운데에 프로젝트별 슬롯 목록, 오른쪽 본문에 고른 MyGame-1의 경로·Unity·메모리·임대·git 자세히, 아래 상태바">
 </p>
 
-앱은 슬롯을 닫거나 임대하지 않습니다. 에디터를 띄우는 것은 **Unity로 열기** 하나뿐이고, 그것도 unity-slot의 `open -NoWait`를 부를 뿐이라 열기 전 검사와 띄우는 방식은 코어가 정합니다. 판단은 모두 `unity-slot dashboard -Json`이 하고, 앱은 그 문서를 그립니다. 스크린샷은 [예시 데이터](samples/)로 찍었습니다.
+앱은 슬롯을 닫거나 임대하지 않습니다. 임대를 푸는 것은 낡은 임대(에디터는 닫혔고 기한이 지났거나 잡은 프로그램이 끝난 것)를 사람이 확인하고 누를 때 코어 `release <슬롯> -Stale`을 부르는 것뿐입니다. 에디터를 띄우는 것은 **Unity로 열기** 하나뿐이고, 그것도 unity-slot의 `open -NoWait`를 부를 뿐이라 열기 전 검사와 띄우는 방식은 코어가 정합니다. 판단은 모두 `unity-slot dashboard -Json`이 하고, 앱은 그 문서를 그립니다. 스크린샷은 [예시 데이터](samples/)로 찍었습니다.
 
 ## 화면 구성
 
@@ -119,6 +119,7 @@ Unity로 열기에는 단축키가 없습니다. 실수로 에디터를 띄우�
 ## 우클릭 메뉴
 
 - 슬롯: **Unity로 열기**, 열 프로그램으로 열기(기본 Fork), 탐색기, 경로 복사. Unity로 열기는 `unity-slot open <슬롯> -NoWait`를 부르므로 이미 열렸는지, batch 실행·잠긴 `Temp\UnityLockfile`·설치 안 된 Unity 버전 검사와 수용량 경고가 코어 그대로 적용됩니다. 플랫폼(`-BuildTarget`)은 넘기지 않습니다. 이미 열린 슬롯에서는 **Unity 창 보기**로 바뀝니다. 남이 임대한 닫힌 슬롯, 폴더가 없는 슬롯, batch 실행 중인 슬롯에서는 꺼져 있습니다. 임대는 잡지 않습니다.
+- 슬롯: **낡은 임대 풀기**는 코어 대시보드가 `lease.stale`로 표시한 슬롯에만 나옵니다(에디터·batch 없음, 기한이 지났거나 임대를 잡은 에이전트 프로그램이 끝남). 확인 창에 실행할 명령(`unity-slot release <슬롯> -Stale`)을 보여 주고, 누르면 코어가 상태를 다시 확인한 뒤 임대 파일만 지웁니다. 그 사이 에디터가 열렸거나 임대가 갱신됐으면 코어가 거절하고 아무것도 바꾸지 않습니다. 에디터는 건드리지 않습니다. 쓰고 있는 임대는 풀지 않습니다(필요하면 CLI `release <슬롯> -AnyOwner`).
 - 브랜치: 이름 복사, 체크아웃한 슬롯을 열 프로그램으로 열기, 탐색기, 이 브랜치 정리 요청 복사, 보기용 ref 이름 복사.
 - **정리 요청 복사**는 주의할 항목(원격에 없는 커밋, upstream 없는 브랜치, stash, 임대 없이 열린 에디터 등)을 마크다운 체크리스트로 클립보드에 넣습니다. 에이전트 세션에 붙여 넣으면 에이전트가 항목마다 무엇을 할지 묻고 승인한 것만 처리합니다.
 
@@ -156,7 +157,7 @@ flowchart LR
     cli <--> state[("상태 폴더")]
     cli -- "dashboard -Json" --> widget["Unity Slot Widget"]
     widget -- "Unity로 열기: open -NoWait" --> cli
-    widget -- "사람이 누를 때만: branch-view" --> cli
+    widget -- "사람이 누를 때만: branch-view, release -Stale" --> cli
     person -. "곁눈으로 확인" .-> widget
 ```
 
@@ -226,7 +227,7 @@ Tauri 없이 화면만 보려면 `npm run dev`를 실행한 뒤 브라우저에�
 ## 하지 않는 것
 
 - 슬롯 저장소에 쓰지 않습니다(fetch·pull·push·체크아웃 포함). 보기용 저장소는 사람이 누를 때만 코어 `branch-view`가 만들고 갱신합니다. 보기용 저장소는 백업이 아닙니다.
-- 슬롯 닫기·임대, 프로세스 종료. Unity.exe를 직접 띄우지 않습니다. Unity로 열기는 unity-slot `open`이 합니다.
+- 슬롯 닫기·임대, 쓰고 있는 임대 풀기, 프로세스 종료. Unity.exe를 직접 띄우지 않습니다. Unity로 열기는 unity-slot `open`이 합니다.
 - 네트워크 통신, 로컬 포트 열기. 화면과 Rust 사이는 Tauri IPC만 씁니다.
 - 명령줄 표시. unity-slot의 dashboard 출력에는 명령줄이 없습니다(Hub 토큰 등).
 - 기본으로 자동 시작하기
