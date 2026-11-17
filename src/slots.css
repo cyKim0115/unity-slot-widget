@@ -329,7 +329,8 @@
   border-style: dashed;
   border-color: var(--warn);
 }
-.path-part {
+/* .part.path-part: stronger than the .part default further down, so a long project name can shrink */
+.part.path-part {
   font-family: var(--font-mono);
   font-size: 11px;
   flex-shrink: 1;
