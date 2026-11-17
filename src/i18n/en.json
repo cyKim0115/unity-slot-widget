@@ -458,7 +458,7 @@
   "bv.detailSlots": "{n} slots: {list}",
   "bv.detailSize": "Estimated size: about {size} (the largest slot's packs)",
   "bv.detailReadOnly": "Slots are only read; nothing is written to a slot's repository.",
-  "bv.detailNotBackup": "Not a backup: a branch deleted in a slot goes here too.",
+  "bv.detailNotBackup": "Not a backup: a branch deleted in a slot disappears here too.",
   "dialog.cancel": "Cancel",
   "list.label": "Slot list",
   "list.noMatch": "No slot matches",
