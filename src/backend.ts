@@ -83,6 +83,9 @@ const PREVIEW_SETTINGS: Record<string, unknown> = {
   theme: previewTheme === "light" || previewTheme === "dark" ? previewTheme : "system",
 };
 
+/** Stands in for widget.json `projectAliases` (src-tauri/src/settings.rs set_alias), in memory only. */
+const PREVIEW_ALIASES: Record<string, string> = {};
+
 async function preview(cmd: string, args?: Record<string, unknown>): Promise<unknown> {
   switch (cmd) {
     case "get_settings":
@@ -91,6 +94,16 @@ async function preview(cmd: string, args?: Record<string, unknown>): Promise<unk
       // Same answer as the Rust side: the whole settings after merging the changed keys
       Object.assign(PREVIEW_SETTINGS, (args?.patch as Record<string, unknown>) ?? {});
       return { ...PREVIEW_SETTINGS };
+    case "get_project_aliases":
+      return { ...PREVIEW_ALIASES };
+    case "set_project_alias": {
+      const name = String(args?.project ?? "");
+      const alias = String(args?.alias ?? "").trim();
+      if (!name) throw "project:empty";
+      if (alias && alias !== name) PREVIEW_ALIASES[name] = alias;
+      else delete PREVIEW_ALIASES[name];
+      return { ...PREVIEW_ALIASES };
+    }
     case "get_dashboard": {
       const name = query.get("sample") ?? "dashboard";
       const response = await fetch(`/samples/${encodeURIComponent(name)}.sample.json`);

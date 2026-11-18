@@ -14,6 +14,7 @@
  */
 import type { Dashboard, OrphanWorker, Slot, UnregisteredEditor } from "../types";
 import { formatGb, formatWhen, t } from "../i18n";
+import { projectAlias, projectLabel, projectMatches } from "../aliases";
 import { fetchRange, groupName, isOpen, layoutCounts, projectGroups, repoCounts, type RepoCounts, repoKey } from "../model";
 import {
   bodyMessage,
@@ -23,6 +24,7 @@ import {
   nameHtml,
   pill,
   platformChip,
+  projectNameHtml,
   repoPills,
   row,
   since,
@@ -143,7 +145,7 @@ export function buildSlotList(doc: Dashboard, state: ListState, ctx: RowContext)
   const keys: string[] = [];
   for (const [name, members] of projectGroups(doc.slots ?? [])) {
     if (state.project !== null && name !== state.project) continue;
-    const groupHit = finding && name.toLowerCase().includes(text);
+    const groupHit = finding && projectMatches(name, text);
     const shown = members.filter((s) => {
       if (state.filter === "open" && !isOpen(s)) return false;
       if (state.filter === "attention" && !state.warned.has(s.name)) return false;
@@ -195,11 +197,11 @@ function groupHead(g: GroupView, ctx: RowContext): string {
     })
     .join("");
   return `<div class="item group-head" role="treeitem" aria-level="1" aria-expanded="${!g.collapsed}" data-item="${esc(g.key)}" aria-label="${esc(
-    `${g.name} ${t("row.openCount", { open, total: g.members.length })}`,
+    `${projectLabel(g.name)} ${t("row.openCount", { open, total: g.members.length })}`,
   )}">
     <div class="group-line">
       <span class="fold" data-fold aria-hidden="true">${CHEVRON}</span>
-      ${nameHtml(g.name, "group-name")}
+      ${projectNameHtml(g.name, "group-name")}
       <span class="head-end">${pill("plain", "", `${open}/${g.members.length}`, t("row.openCount", { open, total: g.members.length }))}</span>
     </div>
     ${lines}
@@ -235,7 +237,7 @@ export function slotListHtml(view: SlotListView, ctx: RowContext): string {
   const html = view.groups.map(
     (g) => `<section class="group" role="none" data-group="${esc(g.name)}">
       ${groupHead(g, ctx)}
-      ${g.collapsed ? "" : `<ul class="slots" role="group" aria-label="${esc(g.name)}">${g.shown.map((s) => row(s, ctx, slotKey(s.name))).join("")}</ul>`}
+      ${g.collapsed ? "" : `<ul class="slots" role="group" aria-label="${esc(projectLabel(g.name))}">${g.shown.map((s) => row(s, ctx, slotKey(s.name))).join("")}</ul>`}
     </section>`,
   );
   const x = view.extra;
@@ -322,9 +324,11 @@ export function groupBody(g: GroupView, ctx: RowContext, filtered: boolean): str
   const state = [t("row.openCount", { open, total: g.members.length }), layoutLine(g.members, ctx)].filter(Boolean).join(" · ");
   const buttons = [
     actButton("project", t(filtered ? "group.showAll" : "group.onlyThis"), { data: { project: g.name } }),
-    actButton("cleanup-project", t("menu.cleanupScope", { scope: g.name }), { data: { project: g.name } }),
+    actButton("cleanup-project", t("menu.cleanupScope", { scope: projectLabel(g.name) }), { data: { project: g.name } }),
+    actButton("rename-project", t("menu.rename"), { data: { project: g.name } }),
   ];
   const rows: string[] = [];
+  if (projectAlias(g.name)) rows.push(detailRow(t("group.realName"), esc(g.name)));
   for (const r of g.repos) {
     const counts = r.counts;
     const value = counts

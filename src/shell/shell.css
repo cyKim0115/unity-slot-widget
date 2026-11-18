@@ -677,6 +677,31 @@
 #dialog-detail[hidden] {
   display: none;
 }
+/* showPrompt: one line of text (a project nickname) */
+#dialog-input {
+  display: block;
+  box-sizing: border-box;
+  width: 100%;
+  height: 30px;
+  margin: 12px 0 0;
+  padding: 0 8px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--bg);
+  color: var(--fg);
+  font: inherit;
+}
+#dialog-input:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -1px;
+  border-color: var(--accent);
+}
+#dialog-input::placeholder {
+  color: var(--muted);
+}
+#dialog-input[hidden] {
+  display: none;
+}
 .dialog-actions {
   display: flex;
   justify-content: flex-end;

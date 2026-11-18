@@ -8,13 +8,14 @@
 import type { Dashboard, Slot, WidgetSettings } from "../types";
 import { formatGb, t } from "../i18n";
 import { isOpen, projectGroups } from "../model";
+import { projectLabel } from "../aliases";
 import { layoutLine } from "../screens/slots";
 import { esc, nameHtml, type RowContext } from "../view";
 
-function projectRow(value: string, label: string, members: Slot[], current: boolean, mark: string, line: string, extra = ""): string {
+function projectRow(value: string, label: string, members: Slot[], current: boolean, mark: string, line: string, extra = "", title = label): string {
   const open = members.filter(isOpen).length;
   return `<li><button type="button" class="panel-row project-row${line ? " two-line" : ""}" data-project="${esc(value)}" aria-pressed="${current}">
-    <span class="line1">${nameHtml(label, "grow")}${mark}<span class="side">${esc(t("row.openCount", { open, total: members.length }))}</span></span>
+    <span class="line1">${nameHtml(label, "grow", title)}${mark}<span class="side">${esc(t("row.openCount", { open, total: members.length }))}</span></span>
     ${line ? `<span class="line2">${esc(line)}</span>` : ""}
   </button>${extra}</li>`;
 }
@@ -31,7 +32,7 @@ export function projectsPanel(
   const slots = doc.slots ?? [];
   const warnMark = `<span class="sev warn" title="${esc(t("nav.warnings"))}"></span>`;
   const rows = [...projectGroups(slots)].map(([name, members]) =>
-    projectRow(name, name, members, project === name, members.some((s) => warned.has(s.name)) ? warnMark : "", layoutLine(members, ctx), extra?.(name, members) ?? ""),
+    projectRow(name, projectLabel(name), members, project === name, members.some((s) => warned.has(s.name)) ? warnMark : "", layoutLine(members, ctx), extra?.(name, members) ?? "", name),
   );
   const all = projectRow("", t("panel.allProjects"), slots, project === null, "", "");
 

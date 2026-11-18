@@ -32,8 +32,9 @@ import {
   viewRef,
 } from "../branches";
 import { daysSince, projectGroups, repoCounts, repoKey } from "../model";
+import { projectAlias, projectLabel, projectMatches } from "../aliases";
 import { icon } from "../icons";
-import { bodyMessage, detailRow, esc, nameHtml, pill, repoPills, type RowContext } from "../view";
+import { bodyMessage, detailRow, esc, nameHtml, pill, projectNameHtml, repoPills, type RowContext } from "../view";
 import { layoutLine, repoLabel } from "./slots";
 
 // ---------------------------------------------------------------- core version
@@ -180,7 +181,7 @@ export function buildBranchList(all: readonly ProjectBranches[], state: BranchLi
   for (const pb of all) {
     if (state.project !== null && pb.project !== state.project) continue;
     if (state.slot !== null && !pb.slots.some((s) => s.name === state.slot)) continue;
-    const projectHit = finding && pb.project.toLowerCase().includes(text);
+    const projectHit = finding && projectMatches(pb.project, text);
     const scoped = pb.groups.filter((g) => (state.slot === null || inSlot(g, state.slot)) && (!finding || projectHit || g.name.toLowerCase().includes(text)));
     const shown = scoped.filter((g) => passesFilter(g, state.filter));
     const changes = pb.changes.filter((c) => (state.slot === null || c.slot.name === state.slot) && (!finding || projectHit || c.slot.name.toLowerCase().includes(text) || (c.branch ?? "").toLowerCase().includes(text)));
@@ -396,11 +397,11 @@ export function branchListHtml(view: BranchListView, ctx: BranchContext): string
         <div class="item group-head" role="treeitem" aria-level="1" aria-expanded="${!pv.collapsed}" data-item="${esc(pv.key)}">
           <div class="group-line">
             <span class="fold" data-fold aria-hidden="true">${CHEVRON}</span>
-            ${nameHtml(pb.project, "group-name")}
+            ${projectNameHtml(pb.project, "group-name")}
             <span class="head-end">${headPills(pb)}</span>
           </div>
         </div>
-        ${pv.collapsed ? "" : `<ul class="slots" role="group" aria-label="${esc(pb.project)}">${rows}</ul>`}
+        ${pv.collapsed ? "" : `<ul class="slots" role="group" aria-label="${esc(projectLabel(pb.project))}">${rows}</ul>`}
       </section>`;
     })
     .join("");
@@ -465,9 +466,11 @@ export function projectBody(pv: ProjectView, ctx: BranchContext, filtered: boole
   const buttons = [
     viewButton(pb, ctx),
     actButton("project", t(filtered ? "group.showAll" : "group.onlyThis"), { data: { project: pb.project } }),
-    actButton("cleanup-project", t("menu.cleanupScope", { scope: pb.project }), { data: { project: pb.project } }),
+    actButton("cleanup-project", t("menu.cleanupScope", { scope: projectLabel(pb.project) }), { data: { project: pb.project } }),
+    actButton("rename-project", t("menu.rename"), { data: { project: pb.project } }),
   ];
   const rows = [detailRow(t("branches.layout"), esc(layoutLine(pb.slots, ctx)))];
+  if (projectAlias(pb.project)) rows.unshift(detailRow(t("group.realName"), esc(pb.project)));
   for (const r of pb.repos) rows.push(detailRow(r.slots.length > 1 ? repoLabel(r.repo.commonDir) : (r.slots[0]?.name ?? repoLabel(r.repo.commonDir)), repoSummary(r.repo, ctx)));
   rows.push(...viewRows(pb, ctx));
   rows.push(detailRow(t("branches.lastFull"), esc(ctx.lastFullAt ? formatWhen(ctx.lastFullAt, ctx.now) : t("detail.none"))));
@@ -515,7 +518,7 @@ export function repoBody(pv: ProjectView, ctx: BranchContext): string {
   return `<div class="body-state">${esc(layoutLine(pb.slots, ctx))}</div>
     <div class="body-actions">${[
       pb.repos[0]?.repo.folders?.[0]?.path ? actButton("open-path", t("bv.openFirst"), { data: { path: pb.repos[0].repo.folders[0].path, target: "fork" } }) : "",
-      actButton("cleanup-project", t("menu.cleanupScope", { scope: pb.project }), { data: { project: pb.project } }),
+      actButton("cleanup-project", t("menu.cleanupScope", { scope: projectLabel(pb.project) }), { data: { project: pb.project } }),
     ].join("")}</div>
     <div class="details">${rows.join("")}</div>`;
 }
@@ -664,9 +667,9 @@ export function branchItemTitle(ref: BranchRef | null): string | null {
   if (!ref) return null;
   switch (ref.kind) {
     case "project":
-      return ref.project;
+      return projectLabel(ref.project);
     case "repo":
-      return `${ref.project} · ${t("branches.repo")}`;
+      return `${projectLabel(ref.project)} · ${t("branches.repo")}`;
     case "branch":
       return ref.name;
     case "changes":
@@ -713,7 +716,7 @@ export function oldCoreList(doc: Dashboard, project: string | null, ctx: RowCont
       </li>`;
     });
     html.push(`<section class="group" data-group="${esc(name)}">
-      <div class="group-head static"><div class="group-line">${nameHtml(name, "group-name")}</div></div>
+      <div class="group-head static"><div class="group-line">${projectNameHtml(name, "group-name")}</div></div>
       <ul class="slots">${rows.join("")}</ul>
     </section>`);
   }

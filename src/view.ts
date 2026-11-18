@@ -6,6 +6,7 @@
 import type { GitState, RepoGit, Slot, SlotEvent, WidgetSettings } from "./types";
 import { formatDuration, formatGb, formatWhen, t } from "./i18n";
 import { icon } from "./icons";
+import { projectLabel } from "./aliases";
 import { elapsedSince, isOpen, localOnlyDays, type RepoCounts, repoCounts, repoKey, repoOfSlot, slotRepoKey } from "./model";
 
 export function esc(value: unknown): string {
@@ -51,11 +52,16 @@ export function splitName(name: string): [string, string] {
 }
 
 /** A name that shortens in the middle when there is no room (CSS `.mid`); the whole name is its title. */
-export function nameHtml(name: string, className = "name"): string {
+export function nameHtml(name: string, className = "name", title = name): string {
   const [head, tail] = splitName(name);
-  return `<span class="${className} mid" title="${esc(name)}"><span class="mid-head">${esc(head)}</span>${
+  return `<span class="${className} mid" title="${esc(title)}"><span class="mid-head">${esc(head)}</span>${
     tail ? `<span class="mid-tail">${esc(tail)}</span>` : ""
   }</span>`;
+}
+
+/** A project as people read it: its nickname (src/aliases.ts), with the real name as the title. */
+export function projectNameHtml(name: string, className = "name"): string {
+  return nameHtml(projectLabel(name), className, name);
 }
 
 /** A span the 1-second ticker keeps up to date. */

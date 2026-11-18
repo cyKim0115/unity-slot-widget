@@ -27,6 +27,18 @@ fn update_settings(app: tauri::AppHandle, patch: serde_json::Map<String, serde_j
     Ok(saved)
 }
 
+/// Project nicknames (widget.json `projectAliases`), by the name the core reports.
+#[tauri::command]
+fn get_project_aliases() -> settings::Aliases {
+    settings::load_aliases()
+}
+
+/// Sets one project's nickname; an empty one shows the core's name again. Returns them all.
+#[tauri::command]
+fn set_project_alias(project: String, alias: String) -> Result<settings::Aliases, String> {
+    settings::set_alias(&project, &alias)
+}
+
 /// The page has painted once: show the window (minimized when Windows started it and the
 /// setting says so). Later calls (a page reload) do nothing.
 #[tauri::command]
@@ -195,6 +207,8 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             get_settings,
             update_settings,
+            get_project_aliases,
+            set_project_alias,
             get_app_info,
             get_core_location,
             get_dashboard,

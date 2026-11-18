@@ -39,6 +39,7 @@
  * state (glance.ts, `set_glance`). A setting changed in widget.json by someone else applies at once.
  */
 
+import { ALIAS_MAX_CHARS, cleanAlias, projectAlias, projectLabel, receiveAliases } from "./aliases";
 import { call, inTauri, isWindowVisible, on } from "./backend";
 import { applyDomTexts, currentLang, formatClock, formatDuration, formatSize, formatWhen, resolveLang, setLang, t } from "./i18n";
 import { glance, newRisks } from "./glance";
@@ -103,7 +104,7 @@ import {
   type ProjectView,
   type ViewAction,
 } from "./screens/branches";
-import { showDialog } from "./shell/dialog";
+import { showDialog, showPrompt } from "./shell/dialog";
 import {
   buildSlotList,
   EXTRA_KEY,
@@ -597,8 +598,9 @@ function itemTitle(ref: ItemRef | null): string {
   if (!ref) return t("app.title");
   switch (ref.kind) {
     case "slot":
-    case "group":
       return ref.name;
+    case "group":
+      return projectLabel(ref.name);
     case "extra":
       return extraTitle(doc?.unregisteredEditors?.length ?? 0, doc?.orphanWorkers?.length ?? 0);
     case "editor":
@@ -729,7 +731,7 @@ function bannerState(): BannerState | null {
     const [name, text] = failed;
     return {
       key: `bv:${name}:${text}`,
-      message: t("bv.bannerFailed", { project: name, text }),
+      message: t("bv.bannerFailed", { project: projectLabel(name), text }),
       warn: true,
       actions: [{ label: t("body.retry"), run: () => void runView(name) }],
     };
@@ -1195,6 +1197,57 @@ async function copyCleanup(scope: CleanupScope = {}) {
   if (await copyText(text)) flashStatus(t("toast.cleanupCopied"), 3500);
 }
 
+// ---------------------------------------------------------------- project nicknames
+
+/**
+ * Asks for a project's nickname (src/aliases.ts) and stores it in widget.json. Saving it empty
+ * shows the core's name again. Only the screens change; filters and copied text keep the name.
+ */
+async function renameProject(name: string) {
+  const current = projectAlias(name) ?? "";
+  const entered = await showPrompt({
+    title: t("rename.title"),
+    message: t("rename.message", { name }),
+    value: current,
+    placeholder: name,
+    maxLength: ALIAS_MAX_CHARS,
+    confirmLabel: t("rename.save"),
+    cancelLabel: t("dialog.cancel"),
+  });
+  if (entered === null) return;
+  const alias = cleanAlias(entered);
+  if (alias === current || (alias === name && current === "")) return;
+  try {
+    receiveAliases(await call<Record<string, string>>("set_project_alias", { project: name, alias }));
+  } catch (error) {
+    flashStatus(t("rename.failed", { text: String(error) }), 5000);
+    return;
+  }
+  const shown = projectAlias(name);
+  flashStatus(shown ? t("rename.done", { name, alias: shown }) : t("rename.cleared", { name }), 3500);
+  render();
+}
+
+/** F2: the selected project head (a project, or the branch screen's repository row). */
+function renameSelectedProject(): boolean {
+  if (view === "branches") {
+    const ref = parseBranchKey(branchSelected);
+    if (ref?.kind !== "project" && ref?.kind !== "repo") return false;
+    void renameProject(ref.project);
+    return true;
+  }
+  const ref = doc ? selectedRef() : null;
+  if (ref?.kind !== "group") return false;
+  void renameProject(ref.name);
+  return true;
+}
+
+/** Nicknames from widget.json; the screens follow when they changed (someone may edit the file). */
+async function loadAliases() {
+  const map = await call<Record<string, string>>("get_project_aliases").catch(() => null);
+  if (map && receiveAliases(map) && doc) render();
+}
+
 function projectScope(name: string | null): CleanupScope {
   if (name === null) return {};
   return { slots: new Set((projectGroups(slots()).get(name) ?? []).map((s) => s.name)), label: name };
@@ -1464,7 +1517,7 @@ async function finishView(name: string, registry: string, result: BranchViewResu
   bvErrors.delete(name);
   const fetched = (entry.slots ?? []).filter((s) => s.action === "fetched").length;
   const failed = (entry.slots ?? []).filter((s) => s.action === "failed" || s.status === "failed").length;
-  flashStatus(t(failed ? "bv.doneFailed" : "bv.done", { project: name, n: fetched, failed }), 5000);
+  flashStatus(t(failed ? "bv.doneFailed" : "bv.done", { project: projectLabel(name), n: fetched, failed }), 5000);
   if (settings.branchViewOpenFork && entry.path) await openPath(entry.path, "fork");
 }
 
@@ -1479,7 +1532,7 @@ function confirmCreate(name: string, entry: BranchViewPlan): Promise<boolean> {
     t("bv.detailNotBackup"),
   ].join("\n");
   return showDialog({
-    title: t("bv.confirmTitle", { project: name }),
+    title: t("bv.confirmTitle", { project: projectLabel(name) }),
     message: t("bv.confirmMessage", { n: slotNames.length }),
     detail,
     confirmLabel: t("bv.confirmCreate"),
@@ -1508,7 +1561,7 @@ async function runView(name: string) {
   let late = false;
   try {
     if (action.kind === "create") {
-      flashStatus(t("bv.planning", { project: name }), 60_000);
+      flashStatus(t("bv.planning", { project: projectLabel(name) }), 60_000);
       const plan = await call<BranchViewResult>("branch_view", { project: registry, apply: false });
       const entry = viewEntry(plan, registry);
       const problem = viewProblem(entry, plan);
@@ -1523,7 +1576,7 @@ async function runView(name: string) {
         return;
       }
     }
-    flashStatus(t(action.kind === "create" ? "bv.creating" : "bv.refreshing", { project: name }), 200_000);
+    flashStatus(t(action.kind === "create" ? "bv.creating" : "bv.refreshing", { project: projectLabel(name) }), 200_000);
     const result = await call<BranchViewResult>("branch_view", { project: registry, apply: true });
     bvRunning = null;
     await finishView(name, registry, result);
@@ -1532,7 +1585,7 @@ async function runView(name: string) {
     if (code === "timeout") {
       // Still running in the core (never killed): the button stays off until it ends
       late = true;
-      flashStatus(t("bv.slow", { project: name }), 10_000);
+      flashStatus(t("bv.slow", { project: projectLabel(name) }), 10_000);
       return;
     }
     failView(name, bvErrorText(code));
@@ -1577,8 +1630,9 @@ function branchMenu(key: string): MenuEntry[] {
       return [
         foldItem(key),
         { label: t(project === pb.project ? "group.showAll" : "group.onlyThis"), action: () => setProject(project === pb.project ? null : pb.project) },
+        { label: t("menu.rename"), shortcut: "F2", action: () => void renameProject(pb.project) },
         "separator",
-        { label: t("menu.cleanupScope", { scope: pb.project }), action: () => void copyCleanup(projectScope(pb.project)) },
+        { label: t("menu.cleanupScope", { scope: projectLabel(pb.project) }), action: () => void copyCleanup(projectScope(pb.project)) },
       ];
     case "repo": {
       const action = viewAction(pb);
@@ -1589,7 +1643,8 @@ function branchMenu(key: string): MenuEntry[] {
         { label: viewButtonLabel(action), disabled: action.off !== null, action: () => void runView(pb.project) },
         ...(viewPath ? [{ label: t("bv.openFork"), action: () => void openPath(viewPath, "fork") }] : []),
         "separator",
-        { label: t("menu.cleanupScope", { scope: pb.project }), action: () => void copyCleanup(projectScope(pb.project)) },
+        { label: t("menu.rename"), shortcut: "F2", action: () => void renameProject(pb.project) },
+        { label: t("menu.cleanupScope", { scope: projectLabel(pb.project) }), action: () => void copyCleanup(projectScope(pb.project)) },
       ];
     }
     case "branch": {
@@ -1673,8 +1728,9 @@ function groupMenu(name: string): MenuEntry[] {
   return [
     { label: t(folded ? "menu.unfold" : "menu.fold"), shortcut: "Enter", action: () => toggleGroup(key) },
     { label: t(project === name ? "group.showAll" : "group.onlyThis"), action: () => setProject(project === name ? null : name) },
+    { label: t("menu.rename"), shortcut: "F2", action: () => void renameProject(name) },
     "separator",
-    { label: t("menu.cleanupScope", { scope: name }), action: () => void copyCleanup(projectScope(name)) },
+    { label: t("menu.cleanupScope", { scope: projectLabel(name) }), action: () => void copyCleanup(projectScope(name)) },
   ];
 }
 
@@ -1711,7 +1767,7 @@ function onTop(): boolean {
 }
 
 function cleanupLabel(): string {
-  return project === null ? t("menu.cleanup") : t("menu.cleanupScope", { scope: project });
+  return project === null ? t("menu.cleanup") : t("menu.cleanupScope", { scope: projectLabel(project) });
 }
 
 function appMenu(): MenuEntry[] {
@@ -1856,6 +1912,9 @@ function onActionClick(e: MouseEvent): boolean {
       break;
     case "cleanup-project":
       void copyCleanup(projectScope(data.project ?? null));
+      break;
+    case "rename-project":
+      if (data.project) void renameProject(data.project);
       break;
     case "focus-pid":
       if (data.pid) focusEditor(Number(data.pid));
@@ -2145,6 +2204,7 @@ function bindEvents() {
         if (slot) void openSlot(slot, settings.openTarget);
       },
     },
+    { keys: "F2", run: renameSelectedProject },
     { keys: "Ctrl+Shift+C", run: () => void copyCleanup(projectScope(project)), inFields: true },
     { keys: "F5", run: () => void refresh(false), inFields: true },
     { keys: "Shift+F5", run: () => void refresh(true), inFields: true },
@@ -2208,6 +2268,7 @@ async function boot() {
   setSheet(sheetOpen);
   paintViewTabs();
   receiveSettings(await call<WidgetSettings>("get_settings").catch(() => null));
+  receiveAliases(await call<Record<string, string>>("get_project_aliases").catch(() => null));
   appInfo = await call<AppInfo>("get_app_info").catch(() => null);
   addSettingsPanels();
   onSettingsChanged(SETTING_KEYS, true);
@@ -2226,7 +2287,10 @@ async function boot() {
   await call("window_ready").catch(() => {});
 
   await on("slot-signal", onSignal);
-  const reloadSettings = () => void call<WidgetSettings>("get_settings").then(receiveSettings).catch(() => {});
+  const reloadSettings = () => {
+    void call<WidgetSettings>("get_settings").then(receiveSettings).catch(() => {});
+    void loadAliases();
+  };
   // Back from the tray: settings may have changed meanwhile; refresh unless one just ended
   await on("widget-shown", () => {
     reloadSettings();

@@ -1,10 +1,11 @@
-import { beforeAll, describe, expect, it } from "vitest";
+import { afterEach, beforeAll, describe, expect, it } from "vitest";
+import { ALIAS_MAX_CHARS, cleanAlias, projectAlias, projectLabel, receiveAliases } from "../aliases";
 import { setLang } from "../i18n";
 import { sharedRepos } from "../model";
 import { defaultSettings } from "../settings";
 import type { Dashboard, GitState, Slot } from "../types";
 import { nameHtml, splitName, type RowContext } from "../view";
-import { buildSlotList, EXTRA_KEY, groupKey, type ListState, parseKey, repoLabel, slotKey, slotListHtml } from "./slots";
+import { buildSlotList, EXTRA_KEY, groupBody, groupKey, type ListState, parseKey, repoLabel, slotKey, slotListHtml } from "./slots";
 
 const NOW = new Date("2026-11-16T12:00:00+09:00");
 
@@ -135,5 +136,54 @@ describe("names shortened in the middle", () => {
     const el = box.firstElementChild as HTMLElement;
     expect(el.title).toBe("<Long>-Name-With-Number-12");
     expect(el.textContent).toBe("<Long>-Name-With-Number-12");
+  });
+});
+
+describe("project nicknames", () => {
+  beforeAll(() => setLang("en"));
+  afterEach(() => receiveAliases({}));
+
+  it("shows the nickname on the group head and keeps the real name for keys and the title", () => {
+    receiveAliases({ MyGame: "  Main game  " });
+    const view = buildSlotList(doc, base, ctx());
+    const box = document.createElement("div");
+    box.innerHTML = slotListHtml(view, ctx());
+    const head = box.querySelector(`[data-item="${groupKey("MyGame")}"]`)!;
+    const name = head.querySelector(".group-name") as HTMLElement;
+    expect(name.textContent).toBe("Main game");
+    expect(name.title).toBe("MyGame");
+    expect(head.getAttribute("aria-label")).toMatch(/^Main game /);
+    expect(box.querySelector('[data-group="MyGame"]')).not.toBeNull();
+    // Without one the name shows as before
+    expect((box.querySelector(`[data-item="${groupKey("Popup")}"] .group-name`) as HTMLElement).textContent).toBe("Popup");
+  });
+
+  it("finds a project by its nickname or its name", () => {
+    receiveAliases({ MyGame: "Main game" });
+    expect(buildSlotList(doc, { ...base, find: "main g" }, ctx()).groups.map((g) => g.name)).toEqual(["MyGame"]);
+    expect(buildSlotList(doc, { ...base, find: "mygame" }, ctx()).groups.map((g) => g.name)).toEqual(["MyGame"]);
+  });
+
+  it("offers renaming in the group details and shows the original name there", () => {
+    receiveAliases({ MyGame: "Main game" });
+    const g = buildSlotList(doc, base, ctx()).groups.find((x) => x.name === "MyGame")!;
+    const box = document.createElement("div");
+    box.innerHTML = groupBody(g, ctx(), false);
+    expect(box.querySelector('[data-act="rename-project"]')?.getAttribute("data-project")).toBe("MyGame");
+    expect(box.textContent).toContain("Original name");
+    receiveAliases({});
+    box.innerHTML = groupBody(g, ctx(), false);
+    expect(box.textContent).not.toContain("Original name");
+  });
+
+  it("drops empty nicknames, nicknames equal to the name and values that are not text", () => {
+    expect(receiveAliases({ A: "", B: "B", C: 3, D: " d\t ", "": "x" })).toBe(true);
+    expect([projectAlias("A"), projectAlias("B"), projectAlias("C"), projectAlias("")]).toEqual([null, null, null, null]);
+    expect(projectLabel("D")).toBe("d");
+    expect(projectLabel("A")).toBe("A");
+    // The same map again is no change; a cleared one is
+    expect(receiveAliases({ D: "d" })).toBe(false);
+    expect(receiveAliases(null)).toBe(true);
+    expect(cleanAlias(`${"x".repeat(ALIAS_MAX_CHARS)}yz `)).toHaveLength(ALIAS_MAX_CHARS);
   });
 });

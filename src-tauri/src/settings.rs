@@ -266,6 +266,93 @@ pub fn update(patch: &Map<String, Value>) -> Result<WidgetSettings, String> {
     update_at(&file(), patch)
 }
 
+// ---------------------------------------------------------------- project nicknames
+
+/// Nicknames the user gave to projects (list groups), by the name the core reports: the
+/// `projectAliases` object of widget.json. Not a [`WidgetSettings`] field, because the settings
+/// popup lists every field there. The screens show a nickname in place of the name; filters, copied
+/// text and core calls keep the real name. Only this key is written; the rest of the file stays.
+pub const ALIASES_KEY: &str = "projectAliases";
+/// Longest nickname kept, in characters (src/aliases.ts has the same number).
+pub const ALIAS_MAX_CHARS: usize = 40;
+
+pub type Aliases = std::collections::BTreeMap<String, String>;
+
+/// A nickname as stored: control characters become spaces, the ends are trimmed, at most
+/// [`ALIAS_MAX_CHARS`]. Empty means none.
+fn clean_alias(text: &str) -> String {
+    let line: String = text.chars().map(|c| if c.is_control() { ' ' } else { c }).collect();
+    let short: String = line.trim().chars().take(ALIAS_MAX_CHARS).collect();
+    short.trim_end().to_string()
+}
+
+/// The readable nicknames of a widget.json object; other values under the key are skipped.
+fn aliases_from(obj: &Map<String, Value>) -> Aliases {
+    let mut out = Aliases::new();
+    if let Some(Value::Object(map)) = obj.get(ALIASES_KEY) {
+        for (project, value) in map {
+            let Value::String(text) = value else { continue };
+            let alias = clean_alias(text);
+            if !project.is_empty() && !alias.is_empty() && alias != *project {
+                out.insert(project.clone(), alias);
+            }
+        }
+    }
+    out
+}
+
+fn load_aliases_from(path: &Path) -> Aliases {
+    match read_object(path) {
+        Ok(Some(obj)) => aliases_from(&obj),
+        _ => Aliases::new(),
+    }
+}
+
+pub fn load_aliases() -> Aliases {
+    load_aliases_from(&file())
+}
+
+/// Sets one project's nickname and returns them all. An empty nickname, or the project's own name,
+/// clears it, so the project shows the core's name again. Nicknames of other projects (someone may
+/// have edited them meanwhile) stay; the key goes away with the last nickname.
+fn set_alias_at(path: &Path, project: &str, alias: &str) -> Result<Aliases, String> {
+    if project.is_empty() {
+        return Err("project:empty".into());
+    }
+    let _guard = WRITE.lock().unwrap_or_else(|e| e.into_inner());
+    let mut obj = read_object(path)?.unwrap_or_default();
+    let alias = clean_alias(alias);
+    let clear = alias.is_empty() || alias == project;
+    let before = obj.get(ALIASES_KEY).cloned();
+    // A value that is not an object cannot hold nicknames: the first one replaces it
+    let mut map = match obj.get(ALIASES_KEY) {
+        Some(Value::Object(map)) => map.clone(),
+        _ => Map::new(),
+    };
+    if clear {
+        map.remove(project);
+    } else {
+        map.insert(project.to_string(), Value::String(alias));
+    }
+    if map.is_empty() {
+        if clear && !matches!(before, Some(Value::Object(_))) {
+            // Nothing stored and nothing to store: leave the file alone
+            return Ok(aliases_from(&obj));
+        }
+        obj.remove(ALIASES_KEY);
+    } else {
+        obj.insert(ALIASES_KEY.to_string(), Value::Object(map));
+    }
+    if obj.get(ALIASES_KEY).cloned() != before {
+        write_replace(path, &to_text(&obj))?;
+    }
+    Ok(aliases_from(&obj))
+}
+
+pub fn set_alias(project: &str, alias: &str) -> Result<Aliases, String> {
+    set_alias_at(&file(), project, alias)
+}
+
 /// The dashboard sample to read instead of running the core: the setting, else the
 /// `UNITY_SLOT_WIDGET_SAMPLE` environment variable (development, screenshots).
 pub fn sample_source(s: &WidgetSettings) -> Option<String> {
@@ -402,6 +489,52 @@ mod tests {
         assert_eq!(sample_source(&with_setting).as_deref(), Some(r"C:\samples\mine.json"));
         std::env::remove_var(SAMPLE_ENV);
         assert_eq!(sample_source(&loaded), None);
+    }
+
+    #[test]
+    fn a_nickname_is_set_and_an_empty_one_restores_the_name() {
+        let path = temp_file("aliases");
+        std::fs::write(&path, r#"{"theme": "dark", "projectAliases": {"Other": "다른 것", "Broken": 3}}"#).unwrap();
+        let saved = set_alias_at(&path, "VeryLongProjectName", "  본편 \n ").unwrap();
+        assert_eq!(saved["VeryLongProjectName"], "본편");
+        assert_eq!(saved["Other"], "다른 것");
+        assert!(!saved.contains_key("Broken"));
+        let file = read(&path);
+        assert_eq!(file["theme"], Value::String("dark".into()));
+        // Values this build cannot read stay in the file as they are
+        assert_eq!(file["projectAliases"]["Broken"], serde_json::json!(3));
+        assert_eq!(load_aliases_from(&path), saved);
+        assert_eq!(load_from(&path).theme, "dark");
+
+        // Empty, or the name itself: the nickname goes away
+        let saved = set_alias_at(&path, "VeryLongProjectName", "   ").unwrap();
+        assert!(!saved.contains_key("VeryLongProjectName"));
+        set_alias_at(&path, "Other", "Other").unwrap();
+        set_alias_at(&path, "Broken", "").unwrap();
+        // The last one takes the key with it
+        assert!(!read(&path).contains_key("projectAliases"));
+        assert_eq!(read(&path)["theme"], Value::String("dark".into()));
+    }
+
+    #[test]
+    fn a_nickname_is_cut_to_its_limit() {
+        let path = temp_file("alias-limit");
+        let long = "가".repeat(ALIAS_MAX_CHARS + 5);
+        let saved = set_alias_at(&path, "P", &format!("a\tb {long}")).unwrap();
+        assert_eq!(saved["P"].chars().count(), ALIAS_MAX_CHARS);
+        assert!(saved["P"].starts_with("a b "));
+        assert!(set_alias_at(&path, "", "x").is_err());
+    }
+
+    #[test]
+    fn clearing_a_nickname_writes_nothing_new() {
+        let path = temp_file("alias-none");
+        assert!(set_alias_at(&path, "P", "").unwrap().is_empty());
+        assert!(!path.exists());
+        std::fs::write(&path, "{ not json").unwrap();
+        assert!(set_alias_at(&path, "P", "별명").is_err());
+        assert_eq!(std::fs::read_to_string(&path).unwrap(), "{ not json");
+        assert!(load_aliases_from(&path).is_empty());
     }
 
     #[test]
