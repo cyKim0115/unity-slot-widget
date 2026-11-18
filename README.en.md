@@ -111,6 +111,7 @@ The theme follows the system; `Ctrl+Shift+D` or the settings fix light or dark. 
 | `Shift+F10` / Menu key | Context menu of the selected row |
 | `Ctrl+C` / `Ctrl+O` | Copy the path or branch name / open with the open program |
 | `Ctrl+Shift+C` | Copy cleanup request (the selected project) |
+| `F2` | Rename the selected project |
 | `F5` / `Shift+F5` | Refresh / refresh detailed git |
 | `Ctrl+,` / `Ctrl+Shift+D` | Settings / light or dark |
 
@@ -120,6 +121,8 @@ Open in Unity has no shortcut: an editor started by mistake uses a lot of memory
 
 - Slot: **Open in Unity**, open with the open program (Fork by default), Explorer, copy path. Open in Unity calls `unity-slot open <slot> -NoWait`, so the core's checks apply as they are: already open, a batch run, a locked `Temp\UnityLockfile`, a Unity version that is not installed, and capacity warnings. The platform (`-BuildTarget`) is not passed. On an open slot it becomes **Show Unity window**. It is disabled for a closed slot leased by someone else, a slot whose folder is missing, and a slot in a batch run. It does not take a lease.
 - Slot: **Release stale lease** shows only on a slot the core's dashboard marks `lease.stale` (no editor or batch run, and the lease ran out or the agent program that took it has exited). The confirmation shows the command it runs (`unity-slot release <slot> -Stale`); the core checks the state again and removes only the lease file. If an editor opened or the lease was renewed meanwhile, the core refuses and changes nothing. It never touches an editor and never releases a lease in use (for that, the CLI `release <slot> -AnyOwner`).
+- Project: collapse the group, show only this project, **Rename**, copy a cleanup request for this project. The Branches screen's project and repository rows have it too.
+- **Rename** (`F2`, or the button in the project's details) gives a project a nickname that only this widget's screens use, for example a short name in your own language for a long English repository name. Group heads, the Projects tab, titles and menus show the nickname; hovering shows the original name. Search finds a project by either name. Save it empty to show the original name again. Nicknames are stored in `projectAliases` (original name → nickname) of `<state folder>\widget.json`, up to 40 characters. The core's registry, the repositories and cleanup requests keep the original name.
 - Branch: copy name, open a slot that has it checked out with the open program, Explorer, copy a cleanup request for this branch, copy the viewing ref name.
 - **Copy cleanup request** puts the items to look at (commits on no remote, branches without an upstream, stashes, editors open without a lease and so on) on the clipboard as a Markdown checklist. Paste it into an agent session; the agent asks what to do with each item and handles only what you approve.
 
