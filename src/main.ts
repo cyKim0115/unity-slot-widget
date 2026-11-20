@@ -710,7 +710,11 @@ function renderBody() {
 
 function renderPanels() {
   const list = currentWarnings();
-  $("projects-body").innerHTML = projectsPanel(doc, settings, warnedSlots(list), project, doc ? rowContext() : null, panelViewLine);
+  const keep = focusedPanelProject();
+  const projects = $("projects-body");
+  projects.innerHTML = projectsPanel(doc, settings, warnedSlots(list), project, doc ? rowContext() : null, panelViewLine);
+  // Every paint rebuilds the rows: the focused one keeps the focus (F2 renames it, Tab goes on from it)
+  if (keep !== null) [...projects.querySelectorAll<HTMLElement>("[data-project]")].find((b) => b.dataset.project === keep)?.focus({ preventScroll: true });
   $("warnings-body").innerHTML = warningsPanel(list);
   $("log-body").innerHTML = logPanel(doc ? (doc.recentEvents ?? []) : null, now());
   const counted = (list ?? []).filter((w) => w.severity !== "info");
@@ -1228,18 +1232,39 @@ async function renameProject(name: string) {
   render();
 }
 
-/** F2: the selected project head (a project, or the branch screen's repository row). */
+/**
+ * F2: the project being pointed at. A side panel project row with the focus comes first (「전체」
+ * is none); then the selected project head in the list (the slot screen's group, the branch
+ * screen's project or repository row). Pressing a project in the side panel filters the list but
+ * leaves the selection where it was: a selection the list does not show gives way to the filter.
+ */
 function renameSelectedProject(): boolean {
-  if (view === "branches") {
-    const ref = parseBranchKey(branchSelected);
-    if (ref?.kind !== "project" && ref?.kind !== "repo") return false;
-    void renameProject(ref.project);
-    return true;
-  }
-  const ref = doc ? selectedRef() : null;
-  if (ref?.kind !== "group") return false;
-  void renameProject(ref.name);
+  if (!doc) return false;
+  const panel = focusedPanelProject();
+  const name = panel !== null ? panel : selectedHeadProject();
+  if (!name) return false;
+  void renameProject(name);
   return true;
+}
+
+/** The side panel's project row with the focus: its project, "" for 「전체」, null when none has it. */
+function focusedPanelProject(): string | null {
+  const el = document.activeElement;
+  const row = el instanceof HTMLElement ? el.closest<HTMLElement>("#projects-body [data-project]") : null;
+  return row ? (row.dataset.project ?? "") : null;
+}
+
+/** The selected head's project, or the filtered project when the list does not show the selection. */
+function selectedHeadProject(): string | null {
+  const key = curSelected();
+  const keys = (view === "branches" ? branchList?.keys : listView?.keys) ?? [];
+  if (key === null || !keys.includes(key)) return project;
+  if (view === "branches") {
+    const ref = parseBranchKey(key);
+    return ref?.kind === "project" || ref?.kind === "repo" ? ref.project : null;
+  }
+  const ref = parseKey(key);
+  return ref?.kind === "group" ? ref.name : null;
 }
 
 /** Nicknames from widget.json; the screens follow when they changed (someone may edit the file). */

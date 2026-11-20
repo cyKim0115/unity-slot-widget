@@ -111,7 +111,7 @@ The theme follows the system; `Ctrl+Shift+D` or the settings fix light or dark. 
 | `Shift+F10` / Menu key | Context menu of the selected row |
 | `Ctrl+C` / `Ctrl+O` | Copy the path or branch name / open with the open program |
 | `Ctrl+Shift+C` | Copy cleanup request (the selected project) |
-| `F2` | Rename the selected project |
+| `F2` | Rename the selected project (a row pressed in the Projects panel comes first) |
 | `F5` / `Shift+F5` | Refresh / refresh detailed git |
 | `Ctrl+,` / `Ctrl+Shift+D` | Settings / light or dark |
 
