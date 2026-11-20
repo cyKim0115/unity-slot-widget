@@ -504,7 +504,7 @@ function renderTools() {
   slotChip.textContent = t("branches.slotFilter", { slot: branchSlot ?? "" });
   slotChip.title = t("branches.slotFilterTitle");
   const pick = $("project-btn");
-  pick.querySelector(".pick-label")!.textContent = project ?? t("panel.allProjects");
+  pick.querySelector(".pick-label")!.textContent = project !== null ? projectLabel(project) : t("panel.allProjects");
   pick.classList.toggle("on", project !== null);
   pick.title = t("project.title");
 }
@@ -1817,7 +1817,7 @@ function projectMenu(): MenuEntry[] {
   return [
     { label: t("panel.allProjects"), checked: project === null, action: () => setProject(null) },
     "separator",
-    ...[...projectGroups(slots()).keys()].map((name): MenuEntry => ({ label: name, checked: project === name, action: () => setProject(name) })),
+    ...[...projectGroups(slots()).keys()].map((name): MenuEntry => ({ label: projectLabel(name), checked: project === name, action: () => setProject(name) })),
   ];
 }
 
