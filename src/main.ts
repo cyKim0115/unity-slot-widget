@@ -125,7 +125,7 @@ import {
   type UnityButton,
 } from "./screens/slots";
 import { relabelBanner, setBannerFocusHome, showBanner, type BannerState } from "./shell/banner";
-import { hideContextMenu, isContextMenuOpen, showContextMenu, showMenuAbove, showMenuBelow, type MenuEntry } from "./shell/context-menu";
+import { isContextMenuOpen, showContextMenu, showMenuAbove, toggleMenuBelow, type MenuEntry } from "./shell/context-menu";
 import { initKeys } from "./shell/keys";
 import { initNav } from "./shell/nav";
 import { isBoolean, readPref, writePref } from "./shell/prefs";
@@ -2104,11 +2104,7 @@ function bindEvents() {
     branchSlot = null;
     render();
   });
-  $("project-btn").addEventListener("click", (e) => {
-    const button = e.currentTarget as HTMLElement;
-    if (isContextMenuOpen()) hideContextMenu();
-    else showMenuBelow(button, projectMenu());
-  });
+  $("project-btn").addEventListener("click", (e) => toggleMenuBelow(e.currentTarget as HTMLElement, projectMenu));
   $("view-tabs").addEventListener("click", (e) => {
     const value = (e.target as HTMLElement).closest<HTMLElement>("[data-view]")?.dataset.view;
     if (isView(value)) selectView(value);
@@ -2149,11 +2145,7 @@ function bindEvents() {
   $("warnings-copy").addEventListener("click", () => void copyCleanup());
 
   $("pin-btn").addEventListener("click", () => void setOnTop(!onTop()));
-  $("app-menu-btn").addEventListener("click", (e) => {
-    const button = e.currentTarget as HTMLElement;
-    if (isContextMenuOpen()) hideContextMenu();
-    else showMenuBelow(button, appMenu());
-  });
+  $("app-menu-btn").addEventListener("click", (e) => toggleMenuBelow(e.currentTarget as HTMLElement, appMenu));
   $("settings-btn").addEventListener("click", () => openSettings());
 
   $("status-path").addEventListener("click", () => {

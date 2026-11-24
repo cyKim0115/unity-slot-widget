@@ -27,6 +27,13 @@ export interface MenuPoint {
 const menu = document.querySelector<HTMLElement>("#context-menu")!;
 /** Focus before opening; given back when the menu closes from inside (Esc, a choice). */
 let returnFocus: HTMLElement | null = null;
+/** The button the open menu hangs from (null for a right-click menu). */
+let anchor: HTMLElement | null = null;
+/**
+ * The anchor that was open when the last pointer went down. The popover's light dismiss closes the
+ * menu before the button's click, so the click would open it again; this tells that click apart.
+ */
+let openAnchorAtPointerDown: HTMLElement | null = null;
 
 const items = (): HTMLButtonElement[] => Array.from(menu.querySelectorAll<HTMLButtonElement>("button:not(:disabled)"));
 
@@ -78,6 +85,7 @@ export function showContextMenu(at: MouseEvent | MenuPoint, entries: MenuEntry[]
   const x0 = at instanceof MouseEvent ? at.clientX : at.x;
   const y0 = at instanceof MouseEvent ? at.clientY : at.y;
   returnFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+  anchor = null;
   // No separator at either end or twice in a row
   const cleaned = entries.filter((e, i, all) => e !== "separator" || (i > 0 && i < all.length - 1 && all[i - 1] !== "separator"));
   menu.replaceChildren(...cleaned.map(entryElement));
@@ -94,6 +102,18 @@ export function showContextMenu(at: MouseEvent | MenuPoint, entries: MenuEntry[]
 export function showMenuBelow(button: HTMLElement, entries: MenuEntry[]): void {
   const r = button.getBoundingClientRect();
   showContextMenu({ x: r.left, y: r.bottom + 2 }, entries);
+  anchor = button;
+}
+
+/**
+ * A menu button's click: opens the menu under it, or closes it when it is already open from this
+ * button (also when the press itself has just closed it by light dismiss).
+ */
+export function toggleMenuBelow(button: HTMLElement, entries: () => MenuEntry[]): void {
+  const dismissedByThisPress = openAnchorAtPointerDown === button;
+  openAnchorAtPointerDown = null;
+  if (isContextMenuOpen()) hideContextMenu();
+  else if (!dismissedByThisPress) showMenuBelow(button, entries());
 }
 
 /** Opens the menu above a button (status bar items). */
@@ -103,7 +123,18 @@ export function showMenuAbove(button: HTMLElement, entries: MenuEntry[]): void {
   showContextMenu({ x: r.left, y: innerHeight }, entries);
   const { height } = menu.getBoundingClientRect();
   menu.style.top = `${Math.max(0, r.top - height - 2)}px`;
+  anchor = button;
 }
+
+// Capture runs before the popover's light dismiss, which closes the menu on pointerup
+document.addEventListener(
+  "pointerdown",
+  (event) => {
+    const target = event.target instanceof Node ? event.target : null;
+    openAnchorAtPointerDown = isContextMenuOpen() && anchor !== null && target !== null && anchor.contains(target) ? anchor : null;
+  },
+  true,
+);
 
 menu.addEventListener("beforetoggle", (event) => {
   if ((event as ToggleEvent).newState === "closed" && menu.contains(document.activeElement)) returnFocus?.focus();
