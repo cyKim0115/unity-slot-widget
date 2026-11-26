@@ -1,6 +1,6 @@
 // Fails the build when the screen texts are not all in the i18n tables:
 // 1. ko.json and en.json have the same keys and the same placeholders;
-// 2. no Hangul outside comments in src/**/*.ts and index.html (screen text goes through t() or data-t);
+// 2. no Hangul outside comments in src/**/*.ts, index.html and mini.html (screen text goes through t() or data-t);
 // 3. every literal t("key") in src/**/*.ts and every data-t / data-t-title / data-t-aria /
 //    data-t-placeholder key in index.html exists in ko.json.
 // Dynamic keys (t(`state.${state}`)) are not checked here.
@@ -132,9 +132,11 @@ for (const full of listTs(join(root, "src"))) {
   }
 }
 
-const html = readFileSync(join(root, "index.html"), "utf8").replace(/<!--[\s\S]*?-->/g, (m) => m.replace(/[^\n]/g, ""));
-hangulLines(html, "index.html");
-for (const m of html.matchAll(/\sdata-t(?:-title|-aria|-placeholder)?="([^"]+)"/g)) use(m[1], "index.html");
+for (const page of ["index.html", "mini.html"]) {
+  const html = readFileSync(join(root, page), "utf8").replace(/<!--[\s\S]*?-->/g, (m) => m.replace(/[^\n]/g, ""));
+  hangulLines(html, page);
+  for (const m of html.matchAll(/\sdata-t(?:-title|-aria|-placeholder)?="([^"]+)"/g)) use(m[1], page);
+}
 
 for (const [key, where] of used) {
   if (!(key in ko)) problems.push(`${where}: key "${key}" is not in ko.json`);
@@ -144,4 +146,4 @@ if (problems.length) {
   console.error(problems.join("\n"));
   process.exit(1);
 }
-console.log(`i18n ok: ${Object.keys(ko).length} keys, ${used.size} literal keys used in src and index.html`);
+console.log(`i18n ok: ${Object.keys(ko).length} keys, ${used.size} literal keys used in src, index.html and mini.html`);

@@ -1,0 +1,107 @@
+/*
+ * The small widget (mini.html): the theme tokens and page base, the slot screen's rules for the state
+ * dot, names, platform, parts and lease or branch text (slots.css), then its own rows.
+ * The window is as tall as the list; while rows come and go the list lines up against the edge the
+ * window keeps (body[data-anchor], src-tauri/src/mini.rs) so the others stay put on screen.
+ */
+@import "../shell/theme/tokens.css";
+@import "../shell/theme/dark.css";
+@import "../shell/theme/base.css";
+@import "../slots.css";
+
+body {
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start;
+  user-select: none;
+  cursor: default;
+}
+body[data-anchor="bottom"] {
+  justify-content: flex-end;
+}
+/* The window's edge, drawn over everything (the list may be shorter than the window for a moment) */
+body::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  border: 1px solid var(--line);
+  pointer-events: none;
+}
+
+#mini-list {
+  flex: none;
+  list-style: none;
+  margin: 0;
+  padding: 4px;
+}
+body.stale #mini-list {
+  opacity: 0.6;
+}
+
+/* No padding or margin on the row itself: its height folds to 0 when it leaves */
+.mrow {
+  overflow: hidden;
+}
+.mrow.entering {
+  opacity: 0;
+}
+.mrow-in {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 5px 8px;
+  border-radius: 6px;
+}
+.mrow:hover .mrow-in {
+  background: var(--hover);
+}
+.mrow.tint-warn .mrow-in {
+  background: var(--tint-warn);
+}
+.mrow.tint-hot .mrow-in {
+  background: var(--tint-hot);
+}
+.mrow.tint-warn:hover .mrow-in,
+.mrow.tint-hot:hover .mrow-in {
+  background-image: linear-gradient(var(--hover), var(--hover));
+}
+.mrow .dot {
+  margin-top: 4px;
+}
+.mrow-text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+.mrow-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+.mrow-head .name {
+  font-size: 12.5px;
+}
+.mem {
+  flex: none;
+  margin-left: auto;
+  font-size: 11px;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+.mem.warn {
+  color: var(--warn);
+}
+.mrow-sub {
+  display: flex;
+  min-width: 0;
+  font-size: 11px;
+  color: var(--muted);
+  white-space: nowrap;
+  overflow: hidden;
+}
+.mrow-error .mrow-sub {
+  white-space: normal;
+}

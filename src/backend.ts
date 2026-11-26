@@ -8,7 +8,8 @@
  * ?view=slots|branches ?select=<slot or item key: g:<project>, x:extra, e:<pid>, bb:<project>/<branch>>
  * ?branch=<name> ?bfilter=attention|checkedout|all ?bslot=<slot> ?project=<name>
  * ?filter=all|open|attention ?nav=projects|warnings|log|closed ?body=hidden ?sheet=open
- * ?frame=<width>x<height> (main.ts).
+ * ?frame=<width>x<height> (main.ts). The small widget: /mini.html with ?sample ?lang ?theme ?only ?anchor
+ * (src/mini/main.ts).
  *
  * The view repository button (core 0.7.0 `branch-view`) is off for sample data. With ?core=1 the
  * sample counts as a core's answer, and a stand-in plans and "makes" view repositories in memory
@@ -133,6 +134,11 @@ async function preview(cmd: string, args?: Record<string, unknown>): Promise<unk
       return { outcome: "released" };
     case "is_autostart_enabled":
       return false;
+    // The small widget (src/mini): always in its mode, and every height "fits"
+    case "mini_active":
+      return true;
+    case "mini_layout":
+      return { shown: Number(args?.height) >= 1, anchor: query.get("anchor") === "top" ? "top" : "bottom" };
     default:
       return null;
   }

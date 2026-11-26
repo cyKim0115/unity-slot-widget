@@ -8,7 +8,9 @@
 //!
 //! Minimized, the window still counts as visible (IsWindowVisible) and everything goes on: the
 //! taskbar badge and the tray tooltip keep showing the state. Only a window hidden to the tray
-//! makes the thread (and the page's refreshes) stop; showing it again refreshes at once.
+//! makes the thread (and the page's refreshes) stop; showing it again refreshes at once. While the
+//! small widget stands in for the window (mini.rs), the signals go to the widget's page instead,
+//! also while the widget itself is hidden (no editor open), so it shows when one opens.
 
 use std::collections::hash_map::DefaultHasher;
 use std::hash::{Hash, Hasher};
@@ -108,11 +110,14 @@ pub fn start(app: AppHandle) {
                 .get_webview_window("main")
                 .and_then(|w| w.is_visible().ok())
                 .unwrap_or(false);
+            let mini = crate::mini::is_active();
             if !visible {
                 was_visible = false;
-                continue;
+                if !mini {
+                    continue;
+                }
             }
-            if !was_visible {
+            if visible && !was_visible {
                 was_visible = true;
                 last = None;
                 last_settings = None;
@@ -124,16 +129,18 @@ pub fn start(app: AppHandle) {
                 let _ = app.emit_to("main", "widget-shown", ());
                 continue;
             }
+            // The page that is refreshing: the main window's, or the small widget's
+            let page = if visible { "main" } else { crate::mini::MINI_LABEL };
             let settings_sig = settings_signature();
             if last_settings.is_some_and(|prev| prev != settings_sig) {
                 // The pin, the background and this interval apply here; the page takes the rest
                 crate::appwindow::apply_settings(&app, &settings::load());
-                let _ = app.emit_to("main", "settings-file-changed", ());
+                let _ = app.emit_to(page, "settings-file-changed", ());
             }
             last_settings = Some(settings_sig);
             let sig = signature();
             if last.is_some_and(|prev| prev != sig) {
-                let _ = app.emit_to("main", "slot-signal", ());
+                let _ = app.emit_to(page, "slot-signal", ());
             }
             last = Some(sig);
         }

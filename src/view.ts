@@ -35,7 +35,7 @@ export function platformChip(platform: string | null | undefined): string {
   return `<span class="chip" title="${esc(platform)}">${esc(code)}</span>`;
 }
 
-function shortOwner(owner: string): string {
+export function shortOwner(owner: string): string {
   return owner.length > 20 ? `${owner.slice(0, 18)}…` : owner;
 }
 

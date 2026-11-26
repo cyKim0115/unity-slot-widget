@@ -242,9 +242,10 @@
   "lang.ko": "한국어",
   "lang.en": "English",
   "settings.closeAction": "Close button (X)",
-  "settings.closeAction.hint": "While hidden in the tray the app stops refreshing. Click the tray icon to bring it back.",
+  "settings.closeAction.hint": "While hidden in the tray the app stops refreshing. The small widget shows only the open editors and goes away when none is open. Click the tray icon or the widget to bring the window back.",
   "settings.closeQuit": "Quit the app",
   "settings.closeTray": "Hide to the tray",
+  "settings.closeWidget": "Small widget",
   "settings.windowOnTop": "Keep the window on top",
   "settings.windowOnTop.hint": "Same as the pin button in the title bar.",
   "settings.autostart": "Start with Windows",
@@ -544,5 +545,10 @@
   "extra.editor": "Editor pid {pid}",
   "extra.worker": "Orphan worker pid {pid}",
   "extra.editorState": "Unregistered editor (not a slot)",
-  "extra.workerState": "Worker whose editor has ended"
+  "extra.workerState": "Worker whose editor has ended",
+
+  "mini.label": "Open editors",
+  "mini.hint": "Click to open the window · drag to move",
+  "mini.error": "Cannot read the slots",
+  "mini.stale": "The last state read. There is no answer now."
 }

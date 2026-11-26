@@ -88,6 +88,7 @@ export const SETTINGS = {
     options: [
       { value: "quit", label: "settings.closeQuit" },
       { value: "tray", label: "settings.closeTray" },
+      { value: "widget", label: "settings.closeWidget" },
     ],
   },
   windowOnTop: { kind: "toggle", section: "general", label: "settings.windowOnTop", hint: "settings.windowOnTop.hint", default: false },

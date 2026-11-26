@@ -1,6 +1,7 @@
 mod appwindow;
 mod core;
 mod install;
+mod mini;
 mod open;
 mod overlay;
 mod paths;
@@ -225,7 +226,10 @@ pub fn run() {
             enable_autostart,
             disable_autostart,
             is_autostart_enabled,
-            window_ready
+            window_ready,
+            mini::mini_layout,
+            mini::mini_active,
+            mini::mini_open_main
         ])
         .setup(|app| {
             tray::install(app)?;
@@ -244,17 +248,40 @@ pub fn run() {
             Ok(())
         })
         .on_window_event(|window, event| {
+            let app = window.app_handle();
+            if window.label() == mini::MINI_LABEL {
+                match event {
+                    // The widget never closes on its own (Alt+F4); it goes when the main window comes back
+                    WindowEvent::CloseRequested { api, .. } => api.prevent_close(),
+                    WindowEvent::ThemeChanged(_) => {
+                        if let Some(mini) = mini::mini_window(app) {
+                            appwindow::paint_background(&mini, &settings::load().theme);
+                        }
+                    }
+                    _ => {}
+                }
+                return;
+            }
             if window.label() != MAIN_LABEL {
                 return;
             }
             match event {
-                // The close box quits, or hides to the tray when the setting says so
-                WindowEvent::CloseRequested { api, .. } if settings::load().close_action == "tray" => {
-                    api.prevent_close();
-                    let _ = window.hide();
-                }
+                // The close box quits, hides to the tray or leaves the small widget, as the setting says
+                WindowEvent::CloseRequested { api, .. } => match settings::load().close_action.as_str() {
+                    "tray" => {
+                        api.prevent_close();
+                        let _ = window.hide();
+                    }
+                    "widget" => {
+                        api.prevent_close();
+                        mini::enter(app);
+                    }
+                    _ => {}
+                },
+                // A hidden widget window would keep the app running after the main window closed
+                WindowEvent::Destroyed => app.exit(0),
                 WindowEvent::ThemeChanged(_) => {
-                    if let Some(window) = window.app_handle().get_webview_window(MAIN_LABEL) {
+                    if let Some(window) = app.get_webview_window(MAIN_LABEL) {
                         appwindow::paint_background(&window, &settings::load().theme);
                     }
                 }

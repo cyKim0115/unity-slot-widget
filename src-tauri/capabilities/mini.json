@@ -1,0 +1,6 @@
+{
+  "identifier": "mini",
+  "description": "The small widget of open editors (src/mini, src-tauri/src/mini.rs)",
+  "windows": ["mini"],
+  "permissions": ["core:default", "core:window:allow-start-dragging"]
+}

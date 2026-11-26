@@ -242,9 +242,10 @@
   "lang.ko": "한국어",
   "lang.en": "English",
   "settings.closeAction": "닫기(X) 단추",
-  "settings.closeAction.hint": "트레이로 숨기면 조회도 멈춰요. 트레이 아이콘을 누르면 다시 보여요.",
+  "settings.closeAction.hint": "트레이로 숨기면 조회도 멈춰요. 작은 위젯은 열린 에디터만 보여 주고, 열린 에디터가 없으면 사라져요. 트레이 아이콘이나 위젯을 누르면 창이 다시 보여요.",
   "settings.closeQuit": "앱 종료",
   "settings.closeTray": "트레이로 숨기기",
+  "settings.closeWidget": "작은 위젯으로",
   "settings.windowOnTop": "창 항상 위",
   "settings.windowOnTop.hint": "제목 표시줄의 핀 단추와 같아요.",
   "settings.autostart": "Windows 시작 시 실행",
@@ -544,5 +545,10 @@
   "extra.editor": "에디터 pid {pid}",
   "extra.worker": "고아 워커 pid {pid}",
   "extra.editorState": "등록 안 된 에디터 (슬롯 아님)",
-  "extra.workerState": "주인 에디터가 끝난 워커"
+  "extra.workerState": "주인 에디터가 끝난 워커",
+
+  "mini.label": "열린 에디터",
+  "mini.hint": "누르면 창 열기 · 끌어서 옮기기",
+  "mini.error": "슬롯 상태를 읽지 못했어요",
+  "mini.stale": "마지막으로 읽은 상태예요. 지금은 응답이 없어요."
 }

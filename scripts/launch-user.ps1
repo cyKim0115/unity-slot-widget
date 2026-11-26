@@ -31,7 +31,7 @@ function Find-VcVars {
 
 function Get-SourceStamp {
   $latest = [datetime]::MinValue
-  foreach ($p in @("package.json", "index.html", "vite.config.ts", "src-tauri\Cargo.toml", "src-tauri\tauri.conf.json")) {
+  foreach ($p in @("package.json", "index.html", "mini.html", "vite.config.ts", "src-tauri\Cargo.toml", "src-tauri\tauri.conf.json")) {
     $full = Join-Path $Root $p
     if (Test-Path $full) {
       $t = (Get-Item $full).LastWriteTimeUtc

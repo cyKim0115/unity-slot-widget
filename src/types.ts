@@ -321,8 +321,8 @@ export interface WidgetSettings {
   language: "auto" | "ko" | "en";
   /** Main window always on top: the title bar pin (the old `alwaysOnTop` key is not read). */
   windowOnTop: boolean;
-  /** The close box (X): quit the app or hide it to the tray. */
-  closeAction: "quit" | "tray";
+  /** The close box (X): quit the app, hide it to the tray, or leave the small widget of the open editors (src/mini). */
+  closeAction: "quit" | "tray" | "widget";
   /** Started by Windows: show the window minimized (refreshes go on). */
   startMinimized: boolean;
   theme: "system" | "light" | "dark";

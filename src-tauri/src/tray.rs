@@ -1,7 +1,8 @@
 //! Notification-area icon.
 //!
-//! The tray is where a window hidden to the tray comes back. Left click shows the window when it
-//! is hidden or minimized and hides it otherwise; right click opens the menu (show the window,
+//! The tray is where a window hidden to the tray (or standing in the small widget, mini.rs) comes
+//! back. Left click shows the window when it is hidden or minimized and hides it otherwise (into the
+//! small widget when the close box is set to it); right click opens the menu (show the window,
 //! settings, quit). The page sends the menu labels in its
 //! language (`set_tray_labels`); until then they are English.
 
@@ -113,8 +114,10 @@ fn on_tray_icon_event(tray: &TrayIcon, event: TrayIconEvent) {
     }
 }
 
-/// Shows the window (also from a second start of the app): visible, restored, in front.
+/// Shows the window (also from a second start of the app): visible, restored, in front. The small
+/// widget, if it was standing in for the window, goes.
 pub fn show_widget(app: &AppHandle) {
+    crate::mini::leave(app);
     let Some(window) = app.get_webview_window(MAIN_LABEL) else {
         return;
     };
@@ -124,8 +127,12 @@ pub fn show_widget(app: &AppHandle) {
     let _ = window.set_focus();
 }
 
+/// Out of sight the way the close box would put it: to the tray, or into the small widget when the
+/// close box is set to it.
 fn hide_widget(app: &AppHandle) {
-    if let Some(window) = app.get_webview_window(MAIN_LABEL) {
+    if crate::settings::load().close_action == "widget" {
+        crate::mini::enter(app);
+    } else if let Some(window) = app.get_webview_window(MAIN_LABEL) {
         let _ = window.hide();
     }
 }

@@ -23,7 +23,8 @@ pub struct WidgetSettings {
     pub language: String,
     /// Main window always on top (the title bar pin). The old `alwaysOnTop` key is not read.
     pub window_on_top: bool,
-    /// The close box: quit | tray (hide to the notification area).
+    /// The close box: quit | tray (hide to the notification area) | widget (the small widget of the
+    /// open editors, mini.rs).
     pub close_action: String,
     /// Started by Windows (`--from-autostart`): show the window minimized.
     pub start_minimized: bool,
@@ -126,7 +127,7 @@ impl WidgetSettings {
         if !matches!(self.language.as_str(), "auto" | "ko" | "en") {
             self.language = "auto".into();
         }
-        if !matches!(self.close_action.as_str(), "quit" | "tray") {
+        if !matches!(self.close_action.as_str(), "quit" | "tray" | "widget") {
             self.close_action = "quit".into();
         }
         if !matches!(self.theme.as_str(), "system" | "light" | "dark") {

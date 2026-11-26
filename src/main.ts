@@ -2317,6 +2317,8 @@ async function boot() {
   await on("settings-file-changed", reloadSettings);
   // The tray menu's Settings
   await on("open-settings", () => openSettings());
+  // A press on a row of the small widget (src/mini): that slot, whatever the filters
+  await on<string>("select-slot", (name) => reveal(slotKey(name)));
   // A view repository run that outlasted the time limit ended
   await on("branch-view-finished", onViewFinished);
 
