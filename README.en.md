@@ -89,7 +89,8 @@ Dark theme: [Slots](docs/assets/app-slots-dark.png) · [Branches](docs/assets/ap
 | Item | Behavior |
 |---|---|
 | First size | 1200x760. Position, size and maximized state are remembered |
-| Close (X) | Quits the app. Settings can change it to "Hide to tray" |
+| Close (X) | Quits the app. Settings can change it to "Hide to tray" or "Small widget" |
+| Small widget | With the close button set to "Small widget", a small frameless window stays on top instead of the main window. It lists only the open editors (starting, ready, stalled, batch), one row each with state, time, lease, branch and memory; rows appear and fold away as editors open and close. With no editor open the widget hides too, and it comes back without taking the focus when one opens. A click brings the main window back with that slot selected; dragging moves it (the position is remembered). It starts in the bottom-right corner of the monitor the window was on; placed in the lower half of a screen it grows and shrinks from its bottom edge. A left click on the tray icon also brings the window back |
 | Tray | Left click shows or hides. Menu: show window, settings, quit. The tooltip shows the worst state (for example "editors 5/6 · stalled 1 · warnings 5") |
 | Minimized | Refreshing goes on while minimized. The taskbar icon carries a critical/attention overlay, and the taskbar flashes when a new critical state appears (stalled start, commit charge critical). Refreshing stops only when hidden to the tray |
 | Start with Windows | Off by default; only an installed copy can turn it on. Started by Windows, it starts minimized (a setting) |
@@ -206,7 +207,7 @@ The gear in the title bar, the tray menu or `Ctrl+,`. A change applies at once a
 | Category | Item | Default |
 |---|---|---|
 | General | Display language | system language |
-| | Close (X) button | quit the app (or hide to tray) |
+| | Close (X) button | quit the app (or hide to tray, or small widget) |
 | | Window always on top | off |
 | | Start with Windows | off (installed copy only) |
 | | Start minimized when started with Windows | on |
