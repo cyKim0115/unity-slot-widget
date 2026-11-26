@@ -2,7 +2,7 @@
  * Color tokens, light values. Dark values: dark.css (same names).
  * Adapted from https://github.com/cyKim0115/Frond/ @99d89bc, MIT, same author (src/style.css :root,
  * the sage charcoal palette). The eight shell tokens keep Frond's names and values; the status tokens
- * are this app's. Every token is a solid color (no alpha): the window is opaque.
+ * are this app's. Every token is a solid color (no alpha): the window's card is opaque (frame.css).
  *
  * Text rules, kept by theme.test.ts (WCAG 4.5:1):
  * - fg, muted, warn, hot, info, batch: text on bg, sidebar-bg, tint-warn and tint-hot;

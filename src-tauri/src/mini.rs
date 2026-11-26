@@ -11,6 +11,9 @@
 //! taskbar), one in the upper half keeps its top edge. The window is made the first time the mode
 //! starts and kept, hidden, after it ends. The window-state plugin keeps its position.
 //!
+//! The window is transparent without an OS shadow: the page draws a card with rounded corners and
+//! its shadow inside a margin of FRAME px (src/shell/frame.css), and the sizes here include it.
+//!
 //! Showing and hiding go through Win32 directly: tao's `show` activates the window, and a widget
 //! that pops up while the person types elsewhere must not take the keyboard.
 
@@ -22,14 +25,18 @@ use windows::Win32::UI::WindowsAndMessaging::{
     IsWindowVisible, SetWindowPos, ShowWindow, SWP_NOACTIVATE, SWP_NOZORDER, SW_HIDE, SW_SHOWNOACTIVATE,
 };
 
-use crate::{appwindow, settings};
+use crate::appwindow;
 
 pub const MINI_LABEL: &str = "mini";
-/// Width in logical pixels (src/mini/mini.css draws to the window's width).
-const WIDTH: f64 = 288.0;
+/// The transparent margin around the page's rounded card that holds its shadow, logical pixels
+/// (`--frame-m` in src/shell/frame.css).
+const FRAME: f64 = 8.0;
+/// Width in logical pixels: a 288 px card and the margin on both sides (src/mini/mini.css draws to
+/// the window's width).
+const WIDTH: f64 = 288.0 + 2.0 * FRAME;
 /// Height before the page has measured itself.
 const FIRST_HEIGHT: f64 = 64.0;
-/// Gap to the work area's edges in the default corner, logical pixels.
+/// Gap from the work area's edges to the card in the default corner, logical pixels.
 const MARGIN: f64 = 12.0;
 
 /// The mode is on: the main window was closed to the widget.
@@ -94,13 +101,14 @@ fn create(app: &AppHandle) -> tauri::Result<()> {
         .maximizable(false)
         .minimizable(false)
         .decorations(false)
-        .shadow(true)
+        // Rounded corners: a transparent window, the page draws the card and its shadow (frame.css)
+        .transparent(true)
+        .shadow(false)
         .always_on_top(true)
         .skip_taskbar(true)
         .visible(false)
         .focused(false)
         .build()?;
-    appwindow::paint_background(&window, &settings::load().theme);
     // The window-state plugin put it where it was last time; the first time, the corner
     if !saved {
         place_in_corner(app, &window);
@@ -138,7 +146,8 @@ fn place_in_corner(app: &AppHandle, window: &WebviewWindow) {
         h: work.size.height as i32,
     };
     let scale = monitor.scale_factor();
-    let margin = (MARGIN * scale).round() as i32;
+    // The card keeps MARGIN to the edges; the window's own margin is only its shadow
+    let margin = ((MARGIN - FRAME) * scale).round() as i32;
     // The width the layout gives it (the frame may still count invisible borders now)
     let width = (WIDTH * scale).round() as i32;
     let (x, y) = corner(area, width, size.height as i32, margin);

@@ -8,6 +8,7 @@
 
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { t } from "../i18n";
+import { setFlat } from "./frame";
 
 const GLYPH_MAXIMIZE = "\uE922";
 const GLYPH_RESTORE = "\uE923";
@@ -59,6 +60,8 @@ export function initTitlebar(live: boolean): Titlebar {
     } catch {
       return;
     }
+    // Maximized: square, no margin (frame.css)
+    setFlat(maximized);
     relabel();
   };
   void syncMaximized();

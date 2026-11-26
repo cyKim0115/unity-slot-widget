@@ -126,6 +126,7 @@ import {
 } from "./screens/slots";
 import { relabelBanner, setBannerFocusHome, showBanner, type BannerState } from "./shell/banner";
 import { isContextMenuOpen, showContextMenu, showMenuAbove, toggleMenuBelow, type MenuEntry } from "./shell/context-menu";
+import { initFrame } from "./shell/frame";
 import { initKeys } from "./shell/keys";
 import { initNav } from "./shell/nav";
 import { isBoolean, readPref, writePref } from "./shell/prefs";
@@ -250,6 +251,7 @@ const narrowQuery = matchMedia("(max-width: 719px)");
 
 const nav = initNav(overlayQuery);
 const titlebar = initTitlebar(inTauri);
+initFrame(inTauri);
 const theme = initTheme();
 const settingsDialog = initSettingsDialog();
 

@@ -1,12 +1,14 @@
 /*
- * The small widget (mini.html): the theme tokens and page base, the slot screen's rules for the state
- * dot, names, platform, parts and lease or branch text (slots.css), then its own rows.
- * The window is as tall as the list; while rows come and go the list lines up against the edge the
- * window keeps (body[data-anchor], src-tauri/src/mini.rs) so the others stay put on screen.
+ * The small widget (mini.html): the theme tokens and page base, the rounded card (frame.css), the slot
+ * screen's rules for the state dot, names, platform, parts and lease or branch text (slots.css), then
+ * its own rows. The window is as tall as the card and its margin; while rows come and go the card
+ * lines up against the edge the window keeps (body[data-anchor], src-tauri/src/mini.rs) so the
+ * others stay put on screen.
  */
 @import "../shell/theme/tokens.css";
 @import "../shell/theme/dark.css";
 @import "../shell/theme/base.css";
+@import "../shell/frame.css";
 @import "../slots.css";
 
 body {
@@ -19,13 +21,8 @@ body {
 body[data-anchor="bottom"] {
   justify-content: flex-end;
 }
-/* The window's edge, drawn over everything (the list may be shorter than the window for a moment) */
-body::after {
-  content: "";
-  position: fixed;
-  inset: 0;
-  border: 1px solid var(--line);
-  pointer-events: none;
+#mini-card {
+  flex: none;
 }
 
 #mini-list {

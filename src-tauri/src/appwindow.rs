@@ -1,7 +1,9 @@
-//! The main window: an ordinary window (taskbar button, opaque, no OS frame; the page draws the
-//! title bar). It is made hidden (`visible: false` in tauri.conf.json) and shown once the page has
-//! painted, so a white WebView2 page never flashes; the window background is the theme's color
-//! for the same reason. Started by Windows with 「Start minimized」 on, it shows minimized.
+//! The main window: an ordinary window (taskbar button, no OS frame; the page draws the title bar).
+//! It is transparent without an OS shadow (tauri.conf.json): the page draws an opaque card with
+//! rounded corners and its own shadow inside a small margin (src/shell/frame.css), square and
+//! without the margin while maximized. It is made hidden (`visible: false`) and shown once the page
+//! has painted, so an empty WebView2 page never shows. Started by Windows with 「Start minimized」
+//! on, it shows minimized.
 //!
 //! Position, size and maximized state live in a new window-state file. The widget kept only its
 //! position in the old file (with a 0x0 size, because it sized its height to the content), so on
@@ -9,8 +11,7 @@
 
 use std::sync::atomic::{AtomicBool, Ordering};
 
-use tauri::window::Color;
-use tauri::{AppHandle, Manager, PhysicalPosition, Theme, WebviewWindow};
+use tauri::{AppHandle, Manager, PhysicalPosition, WebviewWindow};
 
 use crate::settings;
 
@@ -18,10 +19,6 @@ pub const MAIN_LABEL: &str = "main";
 /// The window-state plugin's file (in the app config folder).
 pub const STATE_FILE: &str = ".window-state.main.json";
 const OLD_STATE_FILE: &str = ".window-state.json";
-
-/// `--bg` of src/shell/theme/tokens.css (light) and dark.css (a test compares them).
-const BG_LIGHT: (u8, u8, u8) = (0xfc, 0xfd, 0xfc);
-const BG_DARK: (u8, u8, u8) = (0x1b, 0x22, 0x21);
 
 pub struct Startup {
     shown: AtomicBool,
@@ -67,29 +64,14 @@ pub fn show_first(app: &AppHandle) {
     }
 }
 
-/// What the Rust side does with the settings: the window pin, the window backgrounds (the small
-/// widget's too) and the quick-signal interval. At start, after a save from the page, and when widget.json was changed
-/// by someone else (signals.rs), so a pin set in the file by a person or an agent applies too.
+/// What the Rust side does with the settings: the window pin and the quick-signal interval. At
+/// start, after a save from the page, and when widget.json was changed by someone else (signals.rs),
+/// so a pin set in the file by a person or an agent applies too.
 pub fn apply_settings(app: &AppHandle, s: &settings::WidgetSettings) {
     crate::signals::set_interval(s.signal_secs);
     if let Some(window) = main_window(app) {
         let _ = window.set_always_on_top(s.window_on_top);
-        paint_background(&window, &s.theme);
     }
-    if let Some(mini) = crate::mini::mini_window(app) {
-        paint_background(&mini, &s.theme);
-    }
-}
-
-/// Window background in the theme's color: what shows before the page paints and while resizing.
-pub fn paint_background(window: &WebviewWindow, theme: &str) {
-    let dark = match theme {
-        "dark" => true,
-        "light" => false,
-        _ => window.theme().map(|t| t == Theme::Dark).unwrap_or(false),
-    };
-    let (r, g, b) = if dark { BG_DARK } else { BG_LIGHT };
-    let _ = window.set_background_color(Some(Color(r, g, b, 255)));
 }
 
 /// x and y of the main window in the old window-state file.
@@ -174,12 +156,5 @@ mod tests {
         assert_eq!(place(1500, 100, 1200, 760, &areas), Some((720, 100)));
         // On no monitor any more
         assert_eq!(place(5000, 100, 1200, 760, &areas), None);
-    }
-
-    #[test]
-    fn background_colors_match_the_theme_tokens() {
-        let hex = |(r, g, b): (u8, u8, u8)| format!("--bg: #{r:02x}{g:02x}{b:02x};");
-        assert!(include_str!("../../src/shell/theme/tokens.css").contains(&hex(BG_LIGHT)));
-        assert!(include_str!("../../src/shell/theme/dark.css").contains(&hex(BG_DARK)));
     }
 }

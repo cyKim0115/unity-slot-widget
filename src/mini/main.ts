@@ -30,14 +30,15 @@ import { errorRow, miniRow, openSlots, rowKey, rowSignature } from "./rows";
 const STARTING_CAP_MS = 5 * 60_000;
 const ENTER_MS = 180;
 const LEAVE_MS = 200;
-/** Width the preview draws (src-tauri/src/mini.rs WIDTH). */
-const PREVIEW_WIDTH = 288;
+/** Width the preview draws (src-tauri/src/mini.rs WIDTH: the card and its margin). */
+const PREVIEW_WIDTH = 304;
 
 interface Placement {
   shown: boolean;
   anchor: "top" | "bottom";
 }
 
+const card = document.getElementById("mini-card") as HTMLDivElement;
 const list = document.getElementById("mini-list") as HTMLUListElement;
 const theme = initTheme();
 const reduced = matchMedia("(prefers-reduced-motion: reduce)");
@@ -265,7 +266,9 @@ async function step() {
   if (!active) return;
   const { entering, leaving } = apply();
   const gone = leaving.reduce((sum, el) => sum + el.offsetHeight, 0);
-  const full = Math.ceil(list.getBoundingClientRect().height);
+  // The card and the transparent margin around it (frame.css)
+  const margin = parseFloat(getComputedStyle(document.body).paddingTop) || 0;
+  const full = Math.ceil(card.getBoundingClientRect().height + 2 * margin);
   const after = full - Math.ceil(gone);
   if (!rows.size) {
     if (shown) await foldAway(leaving);
@@ -320,6 +323,8 @@ function bindPointer() {
   document.addEventListener("mouseup", (e) => {
     if (e.button !== 0 || !press) return;
     press = null;
+    // The margin around the card (its shadow) only drags
+    if (!card.contains(e.target as Node)) return;
     const slot = (e.target as Element).closest<HTMLElement>("[data-slot]")?.dataset.slot ?? null;
     void call("mini_open_main", { slot });
   });

@@ -1,7 +1,8 @@
-/* Main window styles, in cascade order: theme tokens, page base, app frame, slot screen, branch screen. */
+/* Main window styles, in cascade order: theme tokens, page base, window frame (rounded card), app frame, slot screen, branch screen. */
 @import "./shell/theme/tokens.css";
 @import "./shell/theme/dark.css";
 @import "./shell/theme/base.css";
+@import "./shell/frame.css";
 @import "./shell/shell.css";
 @import "./slots.css";
 @import "./branches.css";

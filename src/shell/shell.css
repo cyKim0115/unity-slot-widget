@@ -588,9 +588,15 @@
 .modal[open] {
   animation: modal-in 160ms var(--panel-ease);
 }
-/* Dims what is behind a popup (not window transparency) */
+/* Dims what is behind a popup (not window transparency): the card only, not the frame's margin (frame.css) */
 .modal::backdrop {
   background: rgb(0 0 0 / 0.32);
+  inset: 8px;
+  border-radius: 8px;
+}
+:root[data-frame="flat"] .modal::backdrop {
+  inset: 0;
+  border-radius: 0;
 }
 .modal[open]::backdrop {
   animation: backdrop-in 160ms ease-out;

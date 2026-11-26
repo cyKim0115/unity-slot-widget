@@ -1,0 +1,39 @@
+/*
+ * Rounded window corners, for the main window and the small widget. Both windows are transparent and
+ * have no OS frame or OS shadow (tauri.conf.json, src-tauri/src/mini.rs); the page draws an opaque
+ * card with rounded corners, a 1px edge and a soft shadow, inset by a margin that only the shadow
+ * uses. Windows 10 has no rounded corners for windows, and a window region (SetWindowRgn) would give
+ * jagged corners and no shadow; see the README.
+ *
+ * Only the margin and the corners outside the card are transparent: the card itself is solid
+ * (no translucent or blurred backgrounds). A maximized main window drops the margin and the corners
+ * (`:root[data-frame="flat"]`, src/shell/frame.ts).
+ * The main window's margin is a resize border (src/shell/frame.ts); the widget's is a drag area.
+ */
+
+:root {
+  --frame-m: 8px;
+  --frame-r: 8px;
+  --frame-shadow: 0 0 0 1px var(--line), 0 1px 6px rgb(0 0 0 / 0.24);
+}
+:root[data-frame="flat"] {
+  --frame-m: 0px;
+  --frame-r: 0px;
+  --frame-shadow: none;
+}
+
+html,
+body {
+  background: transparent;
+}
+body {
+  padding: var(--frame-m);
+}
+
+.frame-card {
+  background: var(--bg);
+  border-radius: var(--frame-r);
+  box-shadow: var(--frame-shadow);
+  /* children (caption buttons, rows) stay inside the corners */
+  overflow: hidden;
+}

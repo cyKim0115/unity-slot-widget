@@ -250,15 +250,9 @@ pub fn run() {
         .on_window_event(|window, event| {
             let app = window.app_handle();
             if window.label() == mini::MINI_LABEL {
-                match event {
-                    // The widget never closes on its own (Alt+F4); it goes when the main window comes back
-                    WindowEvent::CloseRequested { api, .. } => api.prevent_close(),
-                    WindowEvent::ThemeChanged(_) => {
-                        if let Some(mini) = mini::mini_window(app) {
-                            appwindow::paint_background(&mini, &settings::load().theme);
-                        }
-                    }
-                    _ => {}
+                // The widget never closes on its own (Alt+F4); it goes when the main window comes back
+                if let WindowEvent::CloseRequested { api, .. } = event {
+                    api.prevent_close();
                 }
                 return;
             }
@@ -280,11 +274,6 @@ pub fn run() {
                 },
                 // A hidden widget window would keep the app running after the main window closed
                 WindowEvent::Destroyed => app.exit(0),
-                WindowEvent::ThemeChanged(_) => {
-                    if let Some(window) = app.get_webview_window(MAIN_LABEL) {
-                        appwindow::paint_background(&window, &settings::load().theme);
-                    }
-                }
                 _ => {}
             }
         })
