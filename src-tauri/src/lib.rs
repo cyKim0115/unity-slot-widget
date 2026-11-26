@@ -74,13 +74,21 @@ fn get_core_location() -> paths::CoreLocation {
 
 /// `git`: `basic` (status of each slot clone) or `full` (also local-only commits, branches,
 /// stash, worktrees). Runs on a blocking thread so the window stays responsive.
+/// The result is also kept for the small widget (mini.rs `remember`).
 #[tauri::command]
-async fn get_dashboard(git: String) -> Result<core::DashboardResult, String> {
+async fn get_dashboard(app: tauri::AppHandle, git: String) -> Result<core::DashboardResult, String> {
     let s = settings::load();
     let sample = settings::sample_source(&s);
-    tauri::async_runtime::spawn_blocking(move || core::dashboard(&git, &s.unity_slot_script, sample))
+    let result = tauri::async_runtime::spawn_blocking(move || core::dashboard(&git, &s.unity_slot_script, sample))
         .await
-        .map_err(|e| e.to_string())?
+        .map_err(|e| e.to_string())?;
+    if mini::is_active() {
+        mini::trace(if result.is_ok() { "get_dashboard done" } else { "get_dashboard failed" }, false);
+    }
+    if let Ok(result) = &result {
+        mini::remember(&app, result);
+    }
+    result
 }
 
 #[tauri::command]
@@ -229,6 +237,7 @@ pub fn run() {
             window_ready,
             mini::mini_layout,
             mini::mini_active,
+            mini::mini_cached,
             mini::mini_open_main
         ])
         .setup(|app| {
@@ -267,6 +276,7 @@ pub fn run() {
                         let _ = window.hide();
                     }
                     "widget" => {
+                        mini::trace("close requested", true);
                         api.prevent_close();
                         mini::enter(app);
                     }

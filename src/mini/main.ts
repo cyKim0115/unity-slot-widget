@@ -4,9 +4,13 @@
  * one row each, under a title line. A row slides in when its editor opens and folds away when it
  * closes; with no editor open the window hides (the title line with it), and it shows again (without taking the focus) when one opens.
  *
+ * - Draws at once when the mode starts: the window is made ahead (mini.rs `prepare`) and the last
+ *   slot document the app read is drawn first (`mini_cached`), then read again behind it; a
+ *   document the main page reads meanwhile arrives as `mini-dashboard`.
  * - Refreshes like the main page, with `-Git basic` only: every `startingSecs` while an editor is
  *   starting, else every `idleSecs`, and at once on a quick signal (signals.rs sends them here while
- *   the mode is on, also while this window is hidden).
+ *   the mode is on, also while this window is hidden). A read refused because another one runs
+ *   (`busy`, the main page's) is tried again after BUSY_RETRY_MS.
  * - Reports the height it needs (`mini_layout`); Rust sizes, places, shows or hides the window and
  *   says which edge it keeps. The rows line up against that edge while they come and go, so the
  *   others stay where they are on screen. The window grows before rows come in and shrinks after
@@ -24,12 +28,13 @@ import { formatDuration, resolveLang, setLang, t } from "../i18n";
 import { elapsedSince, nowFor } from "../model";
 import { getSettings, receiveSettings } from "../settings";
 import { initTheme } from "../shell/theme";
-import { SUPPORTED_SCHEMA_MAJOR, type Dashboard, type DashboardResult, type WidgetSettings } from "../types";
-import { errorRow, miniRow, openSlots, rowKey, rowSignature } from "./rows";
+import type { Dashboard, DashboardResult, WidgetSettings } from "../types";
+import { checkSchema, errorRow, miniRow, openSlots, rowKey, rowSignature, usableCache, type Cached } from "./rows";
 
 const STARTING_CAP_MS = 5 * 60_000;
 const ENTER_MS = 180;
 const LEAVE_MS = 200;
+const BUSY_RETRY_MS = 1000;
 /** Width the preview draws (src-tauri/src/mini.rs WIDTH: the card and its margin). */
 const PREVIEW_WIDTH = 304;
 
@@ -48,6 +53,8 @@ let active = false;
 let doc: Dashboard | null = null;
 let receivedAt = 0;
 let failed = false;
+/** The last read was refused because another one ran: try again soon. */
+let busy = false;
 let running = false;
 let again = false;
 let timer: number | undefined;
@@ -79,8 +86,12 @@ function applySettings() {
 }
 
 async function reloadSettings() {
-  receiveSettings(await call<WidgetSettings>("get_settings").catch(() => null));
-  receiveAliases(await call<Record<string, string>>("get_project_aliases").catch(() => null));
+  const [settings, aliases] = await Promise.all([
+    call<WidgetSettings>("get_settings").catch(() => null),
+    call<Record<string, string>>("get_project_aliases").catch(() => null),
+  ]);
+  receiveSettings(settings);
+  receiveAliases(aliases);
   applySettings();
 }
 
@@ -99,7 +110,8 @@ function schedule() {
   window.clearTimeout(timer);
   if (!active) return;
   const s = getSettings();
-  timer = window.setTimeout(() => void refresh(), (anyStarting() ? s.startingSecs : s.idleSecs) * 1000);
+  const ms = busy ? BUSY_RETRY_MS : (anyStarting() ? s.startingSecs : s.idleSecs) * 1000;
+  timer = window.setTimeout(() => void refresh(), ms);
 }
 
 async function refresh() {
@@ -111,13 +123,14 @@ async function refresh() {
   running = true;
   try {
     const result = await call<DashboardResult>("get_dashboard", { git: "basic" });
-    const major = /\/(\d+)/.exec(result.document.schema ?? "");
-    if (!major || Number(major[1]) !== SUPPORTED_SCHEMA_MAJOR) throw `schema:${result.document.schema}`;
+    checkSchema(result.document);
     doc = result.document;
     receivedAt = Date.now();
     failed = false;
+    busy = false;
   } catch (e) {
-    if (String(e) !== "busy") failed = true;
+    busy = String(e) === "busy";
+    if (!busy) failed = true;
   } finally {
     running = false;
   }
@@ -135,12 +148,42 @@ function onSignal() {
   signalTimer = window.setTimeout(() => void refresh(), 500);
 }
 
-/** The mode began (or the page loaded into it): read the settings, then the slots. */
+/** Takes a remembered document when it is newer than the one on screen; true when taken. */
+function takeCached(cached: Cached | null): boolean {
+  const use = usableCache(cached, Date.now(), doc ? receivedAt : 0);
+  if (!use) return false;
+  doc = use.result.document;
+  receivedAt = use.receivedAt;
+  failed = false;
+  return true;
+}
+
+/**
+ * The mode began (or the page loaded into it): the settings and the last document the app read
+ * together, draw that at once, then read the slots again.
+ */
 async function start() {
   if (active) return;
   active = true;
-  await reloadSettings();
+  const [settings, aliases, cached] = await Promise.all([
+    call<WidgetSettings>("get_settings").catch(() => null),
+    call<Record<string, string>>("get_project_aliases").catch(() => null),
+    call<Cached | null>("mini_cached").catch(() => null),
+  ]);
+  if (!active) return;
+  receiveSettings(settings);
+  receiveAliases(aliases);
+  applySettings();
+  if (takeCached(cached)) update();
   void refresh();
+}
+
+/** A document another page read while the mode is on (the main page's last refresh). */
+function onDashboard(cached: Cached) {
+  if (!active || !takeCached(cached)) return;
+  busy = false;
+  update();
+  schedule();
 }
 
 /** The main window is back: Rust has hidden the window; forget the rows so the next start begins clean. */
@@ -150,6 +193,7 @@ function stop() {
   window.clearTimeout(signalTimer);
   doc = null;
   failed = false;
+  busy = false;
   shown = false;
   height = 0;
   rows.clear();
@@ -349,6 +393,7 @@ async function boot() {
   }
   await on<boolean>("mini-mode", (on) => (on ? void start() : stop()));
   await on("slot-signal", onSignal);
+  await on<Cached>("mini-dashboard", onDashboard);
   // widget.json changed: language, theme, nicknames, intervals, a sample file; read the slots again too
   await on("settings-file-changed", () => void reloadSettings().then(() => refresh()));
   window.setInterval(tick, 1000);

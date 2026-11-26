@@ -39,6 +39,11 @@ pub fn main_window(app: &AppHandle) -> Option<WebviewWindow> {
     app.get_webview_window(MAIN_LABEL)
 }
 
+/// The main window has been shown once (by the page's first paint, the fallback timer, the tray).
+pub fn was_shown(app: &AppHandle) -> bool {
+    app.state::<Startup>().shown.load(Ordering::SeqCst)
+}
+
 /// The window was shown another way (tray, a second start): the first-show path does nothing more.
 pub fn mark_shown(app: &AppHandle) {
     app.state::<Startup>().shown.store(true, Ordering::SeqCst);
@@ -64,14 +69,16 @@ pub fn show_first(app: &AppHandle) {
     }
 }
 
-/// What the Rust side does with the settings: the window pin and the quick-signal interval. At
-/// start, after a save from the page, and when widget.json was changed by someone else (signals.rs),
-/// so a pin set in the file by a person or an agent applies too.
+/// What the Rust side does with the settings: the window pin, the quick-signal interval and, with
+/// the close box set to the small widget, its window made ahead. At start, after a save from the
+/// page, and when widget.json was changed by someone else (signals.rs), so a pin set in the file by
+/// a person or an agent applies too.
 pub fn apply_settings(app: &AppHandle, s: &settings::WidgetSettings) {
     crate::signals::set_interval(s.signal_secs);
     if let Some(window) = main_window(app) {
         let _ = window.set_always_on_top(s.window_on_top);
     }
+    crate::mini::prepare(app, s);
 }
 
 /// x and y of the main window in the old window-state file.

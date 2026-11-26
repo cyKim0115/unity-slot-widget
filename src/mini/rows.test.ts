@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { receiveAliases } from "../aliases";
 import { setLang, t } from "../i18n";
 import type { Dashboard, Slot } from "../types";
-import { miniRow, openSlots, rowSignature } from "./rows";
+import { CACHE_MAX_MS, miniRow, openSlots, rowSignature, usableCache, type Cached } from "./rows";
 
 const slot = (name: string, state: string, extra: Partial<Slot> = {}): Slot =>
   ({ name, path: `C:\\${name}`, project: "org/game", editor: { state }, ...extra }) as Slot;
@@ -70,5 +70,25 @@ describe("small widget rows", () => {
     const b = at("2026-11-26T10:00:30Z");
     expect(a).not.toEqual(b);
     expect(rowSignature(a)).toEqual(rowSignature(b));
+  });
+});
+
+describe("remembered document", () => {
+  const T = 1_800_000_000_000;
+  const cached = (receivedAt: number, schema = "unity-slot.dashboard/1"): Cached => ({
+    result: { document: { schema, slots: [] } as unknown as Dashboard, ms: 0, source: "core", script: null },
+    receivedAt,
+  });
+
+  it("is drawn when recent and newer than the screen", () => {
+    expect(usableCache(cached(T - 5_000), T, 0)).not.toBeNull();
+    expect(usableCache(cached(T - 5_000), T, T - 9_000)).not.toBeNull();
+  });
+
+  it("is not drawn when old, not newer, missing or of another schema", () => {
+    expect(usableCache(cached(T - CACHE_MAX_MS - 1), T, 0)).toBeNull();
+    expect(usableCache(cached(T - 5_000), T, T - 5_000)).toBeNull();
+    expect(usableCache(null, T, 0)).toBeNull();
+    expect(usableCache(cached(T, "unity-slot.dashboard/2"), T, 0)).toBeNull();
   });
 });

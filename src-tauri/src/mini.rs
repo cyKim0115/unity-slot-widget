@@ -8,8 +8,16 @@
 //! The page refreshes and draws, then reports the height it needs (`mini_layout`); this side sizes,
 //! places and shows or hides the window. A window in the lower half of its monitor keeps its bottom
 //! edge when it grows or shrinks (by default it sits in the bottom-right corner, above the
-//! taskbar), one in the upper half keeps its top edge. The window is made the first time the mode
-//! starts and kept, hidden, after it ends. The window-state plugin keeps its position.
+//! taskbar), one in the upper half keeps its top edge. The window-state plugin keeps its position.
+//!
+//! So that the widget is up at once after the close box (not a WebView2 start and a core call of
+//! one to two seconds later):
+//! - while the close box is set to the widget, the window is made ahead, hidden, shortly after the
+//!   main window first shows (`prepare`), else the first time the mode starts; it is kept, hidden,
+//!   after the mode ends;
+//! - the last slot document any page read (`remember`, from `get_dashboard`) is kept here; the page
+//!   draws it as soon as the mode starts (`mini_cached`) and reads the slots again behind it, and a
+//!   document another page reads while the mode is on reaches it as the event `mini-dashboard`.
 //!
 //! The window is transparent without an OS shadow: the page draws a card with rounded corners and
 //! its shadow inside a margin of FRAME px (src/shell/frame.css), and the sizes here include it.
@@ -18,6 +26,8 @@
 //! that pops up while the person types elsewhere must not take the keyboard.
 
 use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::Mutex;
+use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 use tauri::{AppHandle, Emitter, Manager, PhysicalPosition, WebviewUrl, WebviewWindow, WebviewWindowBuilder};
 use windows::Win32::Foundation::HWND;
@@ -25,7 +35,7 @@ use windows::Win32::UI::WindowsAndMessaging::{
     IsWindowVisible, SetWindowPos, ShowWindow, SWP_NOACTIVATE, SWP_NOZORDER, SW_HIDE, SW_SHOWNOACTIVATE,
 };
 
-use crate::appwindow;
+use crate::{appwindow, core, settings};
 
 pub const MINI_LABEL: &str = "mini";
 /// The transparent margin around the page's rounded card that holds its shadow, logical pixels
@@ -43,6 +53,38 @@ const MARGIN: f64 = 12.0;
 static ACTIVE: AtomicBool = AtomicBool::new(false);
 /// The window is being made (on a thread of its own).
 static CREATING: AtomicBool = AtomicBool::new(false);
+/// The last slot document a page read, for the next start of the mode.
+static LAST: Mutex<Option<Cached>> = Mutex::new(None);
+/// After the main window first shows, made ahead this much later (not to slow its first paint).
+const PREPARE_AFTER: Duration = Duration::from_millis(800);
+/// How long `prepare` waits for the main window's first show.
+const PREPARE_WAIT: Duration = Duration::from_secs(20);
+
+/// A slot document with the wall time it was read (ms since 1970), as the page's refresh gets it.
+#[derive(Clone, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Cached {
+    result: serde_json::Value,
+    received_at: u64,
+}
+
+/// When the close box was last pressed: the timing lines of dev builds count from there.
+static CLOSED_AT: Mutex<Option<Instant>> = Mutex::new(None);
+
+/// Dev builds: a line with the milliseconds since the close box was pressed (`mark` starts the count).
+pub fn trace(what: &str, mark: bool) {
+    if !cfg!(debug_assertions) {
+        return;
+    }
+    let Ok(mut at) = CLOSED_AT.lock() else {
+        return;
+    };
+    if mark {
+        *at = Some(Instant::now());
+    }
+    let ms = at.map(|t| t.elapsed().as_secs_f64() * 1000.0).unwrap_or(-1.0);
+    eprintln!("[mini +{ms:.0}ms] {what}");
+}
 
 pub fn is_active() -> bool {
     ACTIVE.load(Ordering::SeqCst)
@@ -65,20 +107,70 @@ pub fn enter(app: &AppHandle) {
         let _ = app.emit_to(MINI_LABEL, "mini-mode", true);
         return;
     }
+    spawn_create(app, Duration::ZERO, false);
+}
+
+/// The close box is set to the widget: make the window ahead, hidden, so the first close does not
+/// wait for a WebView2 start. Waits for the main window's first show (then PREPARE_AFTER). From
+/// `apply_settings`: at start, after a save, after widget.json changed.
+pub fn prepare(app: &AppHandle, s: &settings::WidgetSettings) {
+    if s.close_action != "widget" || mini_window(app).is_some() {
+        return;
+    }
+    spawn_create(app, PREPARE_AFTER, true);
+}
+
+/// Makes the window on a thread of its own (building a webview on the event loop's thread can wait
+/// on itself). `ahead`: made before the mode starts; it then waits for the main window's first
+/// show and gives up when the setting changed meanwhile.
+fn spawn_create(app: &AppHandle, delay: Duration, ahead: bool) {
     if CREATING.swap(true, Ordering::SeqCst) {
         return;
     }
-    // Not on the event loop's thread: building a webview there can wait on itself
     let app = app.clone();
     std::thread::spawn(move || {
+        if ahead {
+            let started = Instant::now();
+            while !appwindow::was_shown(&app) && started.elapsed() < PREPARE_WAIT {
+                std::thread::sleep(Duration::from_millis(100));
+            }
+            std::thread::sleep(delay);
+            if mini_window(&app).is_some() || (!is_active() && settings::load().close_action != "widget") {
+                CREATING.store(false, Ordering::SeqCst);
+                return;
+            }
+        }
+        trace(if ahead { "create ahead: start" } else { "create: start" }, false);
         let made = create(&app);
+        trace("create: built", false);
         CREATING.store(false, Ordering::SeqCst);
         if let Err(error) = made {
             eprintln!("mini widget: {error}");
             // Without a widget the app would be out of sight: bring the main window back
-            crate::tray::show_widget(&app);
+            if is_active() {
+                crate::tray::show_widget(&app);
+            }
         }
     });
+}
+
+/// Keeps a slot document a page read (any page, `get_dashboard`). While the mode is on it goes to
+/// the widget's page at once too.
+pub fn remember(app: &AppHandle, result: &core::DashboardResult) {
+    let Ok(value) = serde_json::to_value(result) else {
+        return;
+    };
+    let received_at = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|d| d.as_millis() as u64)
+        .unwrap_or(0);
+    let cached = Cached { result: value, received_at };
+    if is_active() {
+        let _ = app.emit_to(MINI_LABEL, "mini-dashboard", cached.clone());
+    }
+    if let Ok(mut last) = LAST.lock() {
+        *last = Some(cached);
+    }
 }
 
 /// The main window is back: the widget hides and its page stops refreshing.
@@ -245,15 +337,25 @@ pub fn mini_layout(app: AppHandle, height: f64) -> Placement {
             let _ = SetWindowPos(hwnd, None, target.x, target.y, target.w, target.h, SWP_NOZORDER | SWP_NOACTIVATE);
             if !IsWindowVisible(hwnd).as_bool() {
                 let _ = ShowWindow(hwnd, SW_SHOWNOACTIVATE);
+                trace("shown", false);
             }
         }
     });
     Placement { shown: true, anchor: if bottom { "bottom" } else { "top" } }
 }
 
+/// The last slot document a page read, to draw at once when the mode starts (the page decides
+/// whether it is recent enough).
+#[tauri::command]
+pub fn mini_cached() -> Option<Cached> {
+    trace("page asks mini_cached", false);
+    LAST.lock().ok().and_then(|last| last.clone())
+}
+
 /// The page asks once it has loaded (the window may be made after the mode began).
 #[tauri::command]
 pub fn mini_active() -> bool {
+    trace("page asks mini_active", false);
     is_active()
 }
 

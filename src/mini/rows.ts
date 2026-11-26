@@ -7,7 +7,7 @@
 import { projectLabel } from "../aliases";
 import { formatGb, t } from "../i18n";
 import { groupName, isOpen } from "../model";
-import type { Dashboard, Slot, WidgetSettings } from "../types";
+import { SUPPORTED_SCHEMA_MAJOR, type Dashboard, type DashboardResult, type Slot, type WidgetSettings } from "../types";
 import { esc, nameHtml, platformChip, shortOwner, since, tint } from "../view";
 
 /** Order of the rows: project (its nickname), then slot name. */
@@ -75,6 +75,37 @@ export function errorRow(): string {
   return `<li class="mrow mrow-error tint-warn" data-key="error" data-sort="">
     <div class="mrow-in"><span class="mrow-text"><span class="mrow-sub warn-text">${esc(t("mini.error"))}</span></span></div>
   </li>`;
+}
+
+/** The last slot document the app read (src-tauri/src/mini.rs `mini_cached`, event `mini-dashboard`). */
+export interface Cached {
+  result: DashboardResult;
+  /** Wall time it was read, ms since 1970. */
+  receivedAt: number;
+}
+
+/** A remembered document older than this is not drawn; the widget waits for its own read. */
+export const CACHE_MAX_MS = 10 * 60_000;
+
+/** The document is one this app reads (schema major), else an error code like the refresh throws. */
+export function checkSchema(doc: Dashboard): void {
+  const major = /\/(\d+)/.exec(doc.schema ?? "");
+  if (!major || Number(major[1]) !== SUPPORTED_SCHEMA_MAJOR) throw `schema:${doc.schema}`;
+}
+
+/**
+ * The remembered document to draw now: readable, not older than CACHE_MAX_MS, and newer than the
+ * one on screen (`shownAt`, 0 for none). Null otherwise.
+ */
+export function usableCache(cached: Cached | null | undefined, now: number, shownAt: number): Cached | null {
+  if (!cached?.result?.document || !Number.isFinite(cached.receivedAt)) return null;
+  if (now - cached.receivedAt > CACHE_MAX_MS || cached.receivedAt <= shownAt) return null;
+  try {
+    checkSchema(cached.result.document);
+  } catch {
+    return null;
+  }
+  return cached;
 }
 
 /** The row without its running times: the same signature means the row need not be drawn again. */
