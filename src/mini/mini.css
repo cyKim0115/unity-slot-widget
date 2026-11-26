@@ -24,6 +24,10 @@ body[data-anchor="bottom"] {
 #mini-card {
   flex: none;
 }
+/* Drawn but not seen until the window is up and the card fades in (src/mini/main.ts) */
+#mini-card.entering {
+  opacity: 0;
+}
 
 /* The title line: a roomier top, drags like the rest and opens the main window on a press */
 #mini-head {
@@ -50,9 +54,6 @@ body.stale #mini-list {
 /* No padding or margin on the row itself: its height folds to 0 when it leaves */
 .mrow {
   overflow: hidden;
-}
-.mrow.entering {
-  opacity: 0;
 }
 .mrow-in {
   display: flex;

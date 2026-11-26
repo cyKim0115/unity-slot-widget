@@ -1,8 +1,10 @@
 /**
  * The small widget's page (mini.html; the window is src-tauri/src/mini.rs). It stands in for the
  * main window while the close box is set to 「작은 위젯으로」: only the slots whose editor is open,
- * one row each, under a title line. A row slides in when its editor opens and folds away when it
- * closes; with no editor open the window hides (the title line with it), and it shows again (without taking the focus) when one opens.
+ * one row each, under a title line. A row unfolds when its editor opens and folds away when it
+ * closes, so the card grows and shrinks smoothly; with no editor open the card fades out and the
+ * window hides (the title line with it), and when one opens it shows again (without taking the
+ * focus) and the card fades in.
  *
  * - Draws at once when the mode starts: the window is made ahead (mini.rs `prepare`) and the last
  *   slot document the app read is drawn first (`mini_cached`), then read again behind it; a
@@ -12,9 +14,11 @@
  *   the mode is on, also while this window is hidden). A read refused because another one runs
  *   (`busy`, the main page's) is tried again after BUSY_RETRY_MS.
  * - Reports the height it needs (`mini_layout`); Rust sizes, places, shows or hides the window and
- *   says which edge it keeps. The rows line up against that edge while they come and go, so the
- *   others stay where they are on screen. The window grows before rows come in and shrinks after
- *   they have gone.
+ *   says which edge it keeps. The card lines up against that edge, so it grows and shrinks away
+ *   from it and the other rows stay where they are on screen. The window is never resized frame by
+ *   frame (WebView2 stutters): it takes its new height at once before the card grows (the room
+ *   outside the card is transparent) and after it has shrunk; the card's height is what animates
+ *   (SIZE_MS, none with reduced motion).
  * - A press brings the main window back with that slot selected; dragging moves the widget.
  *
  * Browser preview: http://localhost:1431/mini.html?sample=dashboard (backend.ts stands in for Rust;
@@ -32,8 +36,10 @@ import type { Dashboard, DashboardResult, WidgetSettings } from "../types";
 import { checkSchema, errorRow, miniRow, openSlots, rowKey, rowSignature, usableCache, type Cached } from "./rows";
 
 const STARTING_CAP_MS = 5 * 60_000;
-const ENTER_MS = 180;
-const LEAVE_MS = 200;
+/** Every size change: rows unfolding and folding, a row drawn at another height, the card coming and going. */
+const SIZE_MS = 200;
+/** One curve for rows that come and go together, so the card's height moves in one direction. */
+const SIZE_EASING = "cubic-bezier(0.2, 0, 0, 1)";
 const BUSY_RETRY_MS = 1000;
 /** Width the preview draws (src-tauri/src/mini.rs WIDTH: the card and its margin). */
 const PREVIEW_WIDTH = 304;
@@ -198,6 +204,8 @@ function stop() {
   height = 0;
   rows.clear();
   list.replaceChildren();
+  for (const run of card.getAnimations()) run.cancel();
+  card.classList.remove("entering");
 }
 
 // ---------------------------------------------------------------- drawing
@@ -219,9 +227,9 @@ function wanted(): Array<{ key: string; html: string }> {
 }
 
 /**
- * Brings the list to what `wanted` says without moving rows that stay: new rows go in (hidden until
- * they fade in), changed rows are drawn again, rows that went are marked as leaving and stay in
- * place until they have folded away.
+ * Brings the list to what `wanted` says without moving rows that stay: new rows go in at their own
+ * height (`step` folds them before anything paints), changed rows are drawn again, rows that went
+ * are marked as leaving and stay in place until they have folded away.
  */
 function apply(): { entering: HTMLElement[]; leaving: HTMLElement[] } {
   const want = wanted();
@@ -242,7 +250,6 @@ function apply(): { entering: HTMLElement[]; leaving: HTMLElement[] } {
     signatures.set(el, sig);
     if (old) old.replaceWith(el);
     else {
-      if (shown && motion()) el.classList.add("entering");
       list.append(el);
       entering.push(el);
     }
@@ -261,32 +268,22 @@ function apply(): { entering: HTMLElement[]; leaving: HTMLElement[] } {
   return { entering, leaving };
 }
 
-/** Rows come in. Not skipped for a window that was just shown and may not count as visible yet: its animations start once it does. */
-function fadeIn(els: HTMLElement[]) {
-  for (const el of els) {
-    el.classList.remove("entering");
-    if (reduced.matches) continue;
-    el.animate([{ opacity: 0, transform: "translateY(-4px)" }, { opacity: 1, transform: "none" }], {
-      duration: ENTER_MS,
-      easing: "ease-out",
-    });
-  }
+/** Waits for the animations, or a timer: a covered window may not run them. */
+async function settle(runs: Animation[]) {
+  if (!runs.length) return;
+  await Promise.race([Promise.all(runs.map((r) => r.finished.catch(() => undefined))), sleep(SIZE_MS + 150)]);
 }
 
-/** Folds the rows away. A timer ends the wait too: a covered window may not run animations. */
-async function foldAway(els: HTMLElement[]) {
-  if (!els.length) return;
-  if (motion()) {
-    const runs = els.map((el) =>
-      el.animate([{ opacity: 1, height: `${el.offsetHeight}px` }, { opacity: 0, height: "0px" }], {
-        duration: LEAVE_MS,
-        easing: "ease-in",
-        fill: "forwards",
-      }),
-    );
-    await Promise.race([Promise.all(runs.map((r) => r.finished.catch(() => undefined))), sleep(LEAVE_MS + 150)]);
-  }
-  for (const el of els) el.remove();
+/** The card comes (`appear`) or goes: a fade and a slight scale from the edge the window keeps. */
+function cardMotion(appear: boolean): Animation {
+  card.style.transformOrigin = document.body.dataset.anchor === "top" ? "center top" : "center bottom";
+  const away = { opacity: 0, transform: "scale(0.96)" };
+  const here = { opacity: 1, transform: "none" };
+  return card.animate(appear ? [away, here] : [here, away], {
+    duration: SIZE_MS,
+    easing: appear ? "ease-out" : "ease-in",
+    fill: appear ? "none" : "forwards",
+  });
 }
 
 /** Asks for the window at `h` logical px (0 hides it). */
@@ -310,28 +307,79 @@ async function layout(h: number) {
 
 async function step() {
   if (!active) return;
-  const { entering, leaving } = apply();
-  const gone = leaving.reduce((sum, el) => sum + el.offsetHeight, 0);
   // The card and the transparent margin around it (frame.css)
   const margin = parseFloat(getComputedStyle(document.body).paddingTop) || 0;
-  const full = Math.ceil(card.getBoundingClientRect().height + 2 * margin);
-  const after = full - Math.ceil(gone);
+  const before = card.offsetHeight;
+  const { entering, leaving } = apply();
+  const leavingHeights = leaving.map((el) => el.offsetHeight);
+  const target = card.offsetHeight - leavingHeights.reduce((sum, h) => sum + h, 0);
+  const full = Math.ceil(target + 2 * margin);
+
+  // Nothing open: the card fades out, then the window hides
   if (!rows.size) {
-    if (shown) await foldAway(leaving);
-    else for (const el of leaving) el.remove();
+    const run = shown && motion() ? cardMotion(false) : null;
+    if (run) await settle([run]);
+    for (const el of leaving) el.remove();
     if (active) await layout(0);
+    run?.cancel();
     return;
   }
-  const appearing = !shown;
-  // Hidden until the window is up, then they fade in (no frame shows them before)
-  if (appearing && !reduced.matches) for (const el of rows.values()) el.classList.add("entering");
-  // Room first for the rows that come in (the leaving ones still take theirs)
-  if (appearing || full > height) await layout(full);
+
+  // Coming up: drawn at full size, invisible until the window is up, then the card fades in.
+  // Not skipped for a window that may not count as visible yet: its animation starts once it does.
+  if (!shown) {
+    const animate = !reduced.matches;
+    if (animate) card.classList.add("entering");
+    for (const el of leaving) el.remove();
+    await layout(full);
+    card.classList.remove("entering");
+    if (active && shown && animate) {
+      // Not awaited (the next update may run meanwhile); ended by the timer if frames stall
+      const run = cardMotion(true);
+      void settle([run]).then(() => {
+        if (run.playState === "running") run.finish();
+      });
+    }
+    return;
+  }
+
+  if (!motion()) {
+    for (const el of leaving) el.remove();
+    if (active && full !== height) await layout(full);
+    return;
+  }
+
+  // Rows that come in start folded, so nothing moves before the window has room
+  const enteringHeights = entering.map((el) => el.offsetHeight);
+  for (const el of entering) {
+    el.style.height = "0px";
+    el.style.opacity = "0";
+  }
+  const now = card.offsetHeight;
+  // Room first: the window takes its new height at once (outside the card it is transparent)
+  if (full > height) await layout(full);
   if (!active) return;
-  if (appearing) fadeIn(Array.from(rows.values()));
-  else fadeIn(entering);
-  await foldAway(leaving);
-  if (active && after !== height) await layout(after);
+  const timing = { duration: SIZE_MS, easing: SIZE_EASING, fill: "forwards" as FillMode };
+  const runs: Animation[] = [];
+  entering.forEach((el, i) =>
+    runs.push(el.animate([{ height: "0px", opacity: 0 }, { height: `${enteringHeights[i]}px`, opacity: 1 }], timing)),
+  );
+  leaving.forEach((el, i) =>
+    runs.push(el.animate([{ height: `${leavingHeights[i]}px`, opacity: 1 }, { height: "0px", opacity: 0 }], timing)),
+  );
+  // Only a row drawn again at another height: the card follows it smoothly
+  if (!entering.length && !leaving.length && now !== before) {
+    runs.push(card.animate([{ height: `${before}px` }, { height: `${now}px` }], { duration: SIZE_MS, easing: SIZE_EASING }));
+  }
+  await settle(runs);
+  for (const el of entering) {
+    el.style.height = "";
+    el.style.opacity = "";
+  }
+  for (const run of runs) run.cancel();
+  for (const el of leaving) el.remove();
+  // Then the window lets go of the room it no longer needs
+  if (active && full < height) await layout(full);
 }
 
 function update() {
