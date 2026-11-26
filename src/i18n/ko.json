@@ -547,6 +547,7 @@
   "extra.editorState": "등록 안 된 에디터 (슬롯 아님)",
   "extra.workerState": "주인 에디터가 끝난 워커",
 
+  "mini.title": "Unity Slot",
   "mini.label": "열린 에디터",
   "mini.hint": "누르면 창 열기 · 끌어서 옮기기",
   "mini.error": "슬롯 상태를 읽지 못했어요",

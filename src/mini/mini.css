@@ -25,11 +25,23 @@ body[data-anchor="bottom"] {
   flex: none;
 }
 
+/* The title line: a roomier top, drags like the rest and opens the main window on a press */
+#mini-head {
+  display: flex;
+  align-items: center;
+  padding: 10px 12px 3px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
 #mini-list {
   flex: none;
   list-style: none;
   margin: 0;
-  padding: 4px;
+  padding: 2px 4px 4px;
 }
 body.stale #mini-list {
   opacity: 0.6;

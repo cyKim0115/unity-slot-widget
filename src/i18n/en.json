@@ -547,6 +547,7 @@
   "extra.editorState": "Unregistered editor (not a slot)",
   "extra.workerState": "Worker whose editor has ended",
 
+  "mini.title": "Unity Slot",
   "mini.label": "Open editors",
   "mini.hint": "Click to open the window · drag to move",
   "mini.error": "Cannot read the slots",

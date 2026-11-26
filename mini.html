@@ -9,8 +9,9 @@
     <script type="module" src="/src/mini/main.ts"></script>
   </head>
   <body>
-    <!-- The small widget (src/mini/main.ts): one row per open editor. Texts come from src/mini/rows.ts. -->
+    <!-- The small widget (src/mini/main.ts): a title line, then one row per open editor. Texts come from src/mini/rows.ts and the i18n tables. -->
     <div id="mini-card" class="frame-card">
+      <header id="mini-head"><span id="mini-title"></span></header>
       <ul id="mini-list"></ul>
     </div>
   </body>

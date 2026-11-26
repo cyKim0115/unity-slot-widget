@@ -1,8 +1,8 @@
 /**
  * The small widget's page (mini.html; the window is src-tauri/src/mini.rs). It stands in for the
  * main window while the close box is set to 「작은 위젯으로」: only the slots whose editor is open,
- * one row each. A row slides in when its editor opens and folds away when it closes; with no editor
- * open the window hides, and it shows again (without taking the focus) when one opens.
+ * one row each, under a title line. A row slides in when its editor opens and folds away when it
+ * closes; with no editor open the window hides (the title line with it), and it shows again (without taking the focus) when one opens.
  *
  * - Refreshes like the main page, with `-Git basic` only: every `startingSecs` while an editor is
  *   starting, else every `idleSecs`, and at once on a quick signal (signals.rs sends them here while
@@ -40,6 +40,7 @@ interface Placement {
 
 const card = document.getElementById("mini-card") as HTMLDivElement;
 const list = document.getElementById("mini-list") as HTMLUListElement;
+const title = document.getElementById("mini-title") as HTMLSpanElement;
 const theme = initTheme();
 const reduced = matchMedia("(prefers-reduced-motion: reduce)");
 
@@ -71,6 +72,7 @@ function applySettings() {
   const s = getSettings();
   setLang(resolveLang(s.language));
   theme.apply(s.theme, s.themeDurationMs);
+  title.textContent = t("mini.title");
   list.setAttribute("aria-label", t("mini.label"));
   document.title = t("mini.label");
   document.body.title = t("mini.hint");
